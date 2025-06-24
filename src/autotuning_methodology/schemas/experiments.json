@@ -364,6 +364,10 @@
                                 "minimum": 2,
                                 "default": 5
                             },
+                            "cap_to_vmin": {
+                                "description": "Whether to allow values below vmin to be capped at vmin in the heatmap (must be reported if applied).",
+                                "type": "boolean"
+                            },
                             "include_y_labels": {
                                 "description": "Whether to show the y-axis labels on the heatmap. Displayed if not set.",
                                 "type": "boolean"
