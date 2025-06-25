@@ -9,7 +9,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.cm import get_cmap
-from matplotlib.colors import LinearSegmentedColormap, rgb2hex
+from matplotlib.colors import to_rgb, to_hex
+# from matplotlib.colors import LinearSegmentedColormap, rgb2hex
 
 from autotuning_methodology.baseline import (
     Baseline,
@@ -37,12 +38,62 @@ remove_from_searchspace_label = " milo"
 objective_time_keys_values = ["compilation", "benchmark", "framework", "search_algorithm", "validation"]
 
 
-def get_colors(strategies: list[dict], scale_margin_left=0.4, scale_margin_right=0.15):
+def lighten_color(color, amount: float = 0.5):
+    """Lightens the given color by interpolating it toward white."""
+    r, g, b = to_rgb(color)
+    return to_hex([(1 - amount) * c + amount for c in (r, g, b)])
+
+def get_colors(strategies: list[dict]) -> list:
+    """Assign colors using the tab10 colormap, with lighter shades for children."""
+    tab10 = plt.get_cmap("tab10").colors
+    max_parents = len(tab10)
+    strategy_parents = defaultdict(list)
+
+    # Group children under their parents
+    for i, strategy in enumerate(strategies):
+        if "color_parent" in strategy:
+            strategy_parents[strategy["color_parent"]].append(i)
+
+    if len(strategy_parents) > max_parents:
+        raise ValueError(f"Too many color parents: max supported is {max_parents} using tab10")
+
+    parent_colors = {}
+    colors = [None] * len(strategies)
+    color_index = 0
+
+    for i, strategy in enumerate(strategies):
+        name = strategy["name"]
+        if name in strategy_parents:
+            children_indices = strategy_parents[name]
+            if len(children_indices) > 2:
+                raise ValueError(f"Color parent '{name}' has more than two children")
+            base_color = tab10[color_index]
+            parent_colors[name] = {
+                idx: lighten_color(base_color, amount=0.4 + 0.3 * j)
+                for j, idx in enumerate(children_indices)
+            }
+            colors[i] = to_hex(base_color)
+            color_index += 1
+        elif "color_parent" in strategy:
+            parent = strategy["color_parent"]
+            colors[i] = parent_colors[parent][i]
+        else:
+            if color_index >= len(tab10):
+                raise ValueError("Too many unparented strategies for tab10 colormap")
+            colors[i] = to_hex(tab10[color_index])
+            color_index += 1
+
+    return colors
+
+
+def get_colors_old(strategies: list[dict], scale_margin_left=0.4, scale_margin_right=0.15) -> list:
     """Function to get the colors for each of the strategies."""
     default_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    main_colors = ["Blues", "Greens", "Reds", "Purples", "Greys"]
+    main_colors = ["Blues", "Greens", "Reds", "Purples", "Greys", "Oranges"]
     main_color_counter = 0
     strategy_parents = defaultdict(list)
+
+    # TODO switch to qualitative colormaps, e.g. tab10 if no children, otherwise tab20 (https://matplotlib.org/stable/users/explain/colors/colormaps.html#qualitative)
 
     # get the dictionary of parents with the index of their child strategies
     for strategy_index, strategy in enumerate(strategies):
@@ -192,11 +243,12 @@ class Visualize:
         compare_baselines: bool = self.experiment["visualization_settings"]["compare_baselines"]
         compare_split_times: bool = self.experiment["visualization_settings"]["compare_split_times"]
         confidence_level: float = self.experiment["visualization_settings"]["confidence_level"]
-        self.colors = get_colors(
-            self.strategies,
-            scale_margin_left=self.experiment["visualization_settings"].get("color_parent_scale_margin_left", 0.4),
-            scale_margin_right=self.experiment["visualization_settings"].get("color_parent_scale_margin_right", 0.1),
-        )
+        self.colors = get_colors(self.strategies)
+        # self.colors = get_colors(
+        #     self.strategies,
+        #     scale_margin_left=self.experiment["visualization_settings"].get("color_parent_scale_margin_left", 0.4),
+        #     scale_margin_right=self.experiment["visualization_settings"].get("color_parent_scale_margin_right", 0.1),
+        # )
         self.plot_skip_strategies: list[str] = list()
         if use_strategy_as_baseline is not None:
             self.plot_skip_strategies.append(use_strategy_as_baseline)
@@ -374,6 +426,7 @@ class Visualize:
             cmin = plot.get("cmin", vmin)  # colorbar lower limit
             cmax = plot.get("cmax", vmax)  # colorbar upper limit
             cnum = plot.get("cnum", 5)  # number of ticks on the colorbar
+            cap_to_vmin = plot.get("cap_to_vmin", False)  # whether to cap the values to vmin
             divide_train_test_axis = plot.get(
                 "divide_train_test_axis", False
             )  # whether to add visual indication for train/test split
@@ -542,6 +595,9 @@ class Visualize:
                         )
 
                     # validate the data is within the vmin-vmax range and visible colorbar range
+                    assert not (plot_data > 1.0).any(), "Plot data contains values greater than 1.0, which should not be possible. Please investigate."
+                    if cap_to_vmin:
+                        plot_data = np.clip(plot_data, vmin, 1.0)
                     outside_range = np.where(np.logical_or(plot_data < vmin, plot_data > vmax))
                     assert (
                         len(outside_range[0]) == 0 and len(outside_range[1]) == 0
