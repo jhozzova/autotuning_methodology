@@ -9,7 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.cm import get_cmap
-from matplotlib.colors import to_rgb, to_hex
+from matplotlib.colors import to_rgb, to_hex, LinearSegmentedColormap
 # from matplotlib.colors import LinearSegmentedColormap, rgb2hex
 
 from autotuning_methodology.baseline import (
@@ -727,9 +727,14 @@ class Visualize:
                     # finalize the figure and save or display it
                     fig.tight_layout()
                     if save_figs:
+                        suffix = ""
+                        if include_colorbar:
+                            suffix += "_colorbar"
+                        if include_y_labels:
+                            suffix += "_ylabels"
                         filename_path = (
                             Path(self.plot_filename_prefix)
-                            / f"{strategy_name}_heatmap_{'_'.join(plot_x_value_types)}_{'_'.join(plot_y_value_types)}"
+                            / f"{strategy_name}_heatmap_{'_'.join(plot_x_value_types)}_{'_'.join(plot_y_value_types)}{suffix}"
                         )
                         fig.savefig(filename_path, dpi=300, bbox_inches="tight", pad_inches=0.01)
                         print(f"Figure saved to {filename_path}")
