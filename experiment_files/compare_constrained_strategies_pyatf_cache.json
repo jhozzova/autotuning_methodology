@@ -1,7 +1,7 @@
 {
     "version": "1.2.0",
-    "name": "Compare constrained strategies",
-    "parent_folder": "./constrained_optimization",
+    "name": "Compare constrained strategies pyATF cached vs non-cached",
+    "parent_folder": "/var/scratch/fjwillem/constrained_optimization",
     "experimental_groups_defaults": {
         "applications": [
             {
@@ -57,103 +57,37 @@
     },
     "search_strategies": [
         {
-            "name": "firefly_constrained",
-            "search_method": "firefly_algorithm",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": true
-                }
-            ],
-            "display_name": "Firefly constrained",
-            "autotuner": "KernelTuner"
-        },
-        {
-            "name": "genetic_algorithm_constrained",
-            "search_method": "genetic_algorithm",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": true
-                }
-            ],
-            "display_name": "Genetic Algorithm constrained",
-            "autotuner": "KernelTuner"
-        },
-        {
-            "name": "genetic_algorithm_non_constrained",
-            "search_method": "genetic_algorithm",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": false
-                }
-            ],
-            "display_name": "Genetic Algorithm non-constrained",
-            "autotuner": "KernelTuner",
-            "color_parent": "genetic_algorithm_constrained"
-        },
-        {
-            "name": "pso_constrained",
-            "search_method": "pso",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": true
-                }
-            ],
-            "display_name": "PSO constrained",
-            "autotuner": "KernelTuner"
-        },
-        {
-            "name": "pso_non_constrained",
-            "search_method": "pso",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": false
-                }
-            ],
-            "display_name": "PSO non-constrained",
-            "autotuner": "KernelTuner",
-            "color_parent": "pso_constrained"
-        },
-        {
-            "name": "simulated_annealing_constrained",
-            "search_method": "simulated_annealing",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": true
-                }
-            ],
-            "display_name": "Simulated Annealing constrained",
-            "autotuner": "KernelTuner"
-        },
-        {
-            "name": "simulated_annealing_non_constrained",
-            "search_method": "simulated_annealing",
-            "search_method_hyperparameters": [
-                {
-                    "name": "constraint_aware",
-                    "value": false
-                }
-            ],
-            "display_name": "Simulated Annealing non-constrained",
-            "autotuner": "KernelTuner",
-            "color_parent": "simulated_annealing_constrained"
-        },
-        {
             "name": "pyatf_simulated_annealing",
             "search_method": "pyatf_strategies",
             "search_method_hyperparameters": [
                 {
                     "name": "searchtechnique",
                     "value": "simulated_annealing"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": true
                 }
             ],
             "display_name": "pyATF Simulated Annealing",
             "autotuner": "KernelTuner"
+        },
+        {
+            "name": "pyatf_simulated_annealing_no_cache",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "simulated_annealing"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": false
+                }
+            ],
+            "display_name": "pyATF Simulated Annealing (no cache)",
+            "autotuner": "KernelTuner",
+            "color_parent": "pyatf_simulated_annealing"
         },
         {
             "name": "pyatf_auc_bandit",
@@ -162,10 +96,31 @@
                 {
                     "name": "searchtechnique",
                     "value": "auc_bandit"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": true
                 }
             ],
             "display_name": "pyATF AUC Bandit",
             "autotuner": "KernelTuner"
+        },
+        {
+            "name": "pyatf_auc_bandit_no_cache",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "auc_bandit"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": false
+                }
+            ],
+            "display_name": "pyATF AUC Bandit (no cache)",
+            "autotuner": "KernelTuner",
+            "color_parent": "pyatf_auc_bandit"
         },
         {
             "name": "pyatf_differential_evolution",
@@ -174,10 +129,64 @@
                 {
                     "name": "searchtechnique",
                     "value": "differential_evolution"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": true
                 }
             ],
             "display_name": "pyATF Differential Evolution",
             "autotuner": "KernelTuner"
+        },
+        {
+            "name": "pyatf_differential_evolution_no_cache",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "differential_evolution"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": false
+                }
+            ],
+            "display_name": "pyATF Differential Evolution (no cache)",
+            "autotuner": "KernelTuner",
+            "color_parent": "pyatf_differential_evolution"
+        },
+        {
+            "name": "pyatf_pattern_search",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "pattern_search"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": true
+                }
+            ],
+            "display_name": "pyATF Pattern Search",
+            "autotuner": "KernelTuner"
+        },
+        {
+            "name": "pyatf_pattern_search_no_cache",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "pattern_search"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": false
+                }
+            ],
+            "display_name": "pyATF Pattern Search (no cache)",
+            "autotuner": "KernelTuner",
+            "color_parent": "pyatf_pattern_search"
         },
         {
             "name": "pyatf_round_robin",
@@ -186,10 +195,31 @@
                 {
                     "name": "searchtechnique",
                     "value": "round_robin"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": true
                 }
             ],
             "display_name": "pyATF Round Robin",
             "autotuner": "KernelTuner"
+        },
+        {
+            "name": "pyatf_round_robin_no_cache",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "round_robin"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": false
+                }
+            ],
+            "display_name": "pyATF Round Robin (no cache)",
+            "autotuner": "KernelTuner",
+            "color_parent": "pyatf_round_robin"
         },
         {
             "name": "pyatf_torczon",
@@ -198,10 +228,31 @@
                 {
                     "name": "searchtechnique",
                     "value": "torczon"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": true
                 }
             ],
             "display_name": "pyATF Torczon",
             "autotuner": "KernelTuner"
+        },
+        {
+            "name": "pyatf_torczon_no_cache",
+            "search_method": "pyatf_strategies",
+            "search_method_hyperparameters": [
+                {
+                    "name": "searchtechnique",
+                    "value": "torczon"
+                },
+                {
+                    "name": "use_searchspace_cache",
+                    "value": false
+                }
+            ],
+            "display_name": "pyATF Torczon (no cache)",
+            "autotuner": "KernelTuner",
+            "color_parent": "pyatf_torczon"
         }
     ],
     "statistics_settings": {
@@ -214,51 +265,6 @@
     },
     "visualization_settings": {
         "plots": [
-            {
-                "scope": "searchspace",
-                "style": "line",
-                "x_axis_value_types": [
-                    "fevals"
-                ],
-                "y_axis_value_types": [
-                    "normalized",
-                    "baseline"
-                ]
-            },
-            {
-                "scope": "searchspace",
-                "style": "line",
-                "x_axis_value_types": [
-                    "time"
-                ],
-                "y_axis_value_types": [
-                    "normalized",
-                    "baseline"
-                ]
-            },
-            {
-                "scope": "search_strategy",
-                "style": "heatmap",
-                "x_axis_value_types": [
-                    "time"
-                ],
-                "y_axis_value_types": [
-                    "searchspaces"
-                ],
-                "bins": 100
-            },
-            {
-                "scope": "search_strategy",
-                "style": "heatmap",
-                "x_axis_value_types": [
-                    "applications"
-                ],
-                "y_axis_value_types": [
-                    "gpus"
-                ],
-                "divide_train_test_axis": "gpus",
-                "divide_train_test_after_num": 3
-            },
             {
                 "scope": "aggregate",
                 "style": "line",
