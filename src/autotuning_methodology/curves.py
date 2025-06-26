@@ -116,7 +116,7 @@ class CurveBasis(ABC):
     """Abstract object providing minimals for visualization and analysis. Implemented by ``Curve`` and ``Baseline``."""
 
     @abstractmethod
-    def get_curve(self, range: np.ndarray, x_type: str, dist: np.ndarray = None, confidence_level: float = None):
+    def get_curve(self, range: np.ndarray, x_type: str, dist: np.ndarray = None, confidence_level: float = None, return_split: bool = True):
         """Get the curve over the specified range of time or function evaluations.
 
         Args:
@@ -124,6 +124,7 @@ class CurveBasis(ABC):
             x_type: the type of the x-axis range (either time or function evaluations).
             dist: the distribution, used for looking up indices. Ignored in ``Baseline``. Defaults to None.
             confidence_level: confidence level for the confidence interval. Ignored in ``Baseline``. Defaults to None.
+            return_split: whether to return the arrays split at the real / fictional point. Defaults to True.
 
         Raises:
             ValueError: on invalid ``x_type`` argument.
@@ -133,19 +134,20 @@ class CurveBasis(ABC):
             See ``get_curve_over_fevals()`` and ``get_curve_over_time()`` for more precise return values.
         """
         if x_type == "fevals":
-            return self.get_curve_over_fevals(range, dist, confidence_level)
+            return self.get_curve_over_fevals(range, dist, confidence_level, return_split=return_split)
         elif x_type == "time":
-            return self.get_curve_over_time(range, dist, confidence_level)
+            return self.get_curve_over_time(range, dist, confidence_level, return_split=return_split)
         raise ValueError(f"x_type must be 'fevals' or 'time', is {x_type}")
 
     @abstractmethod
-    def get_curve_over_fevals(self, fevals_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None):
+    def get_curve_over_fevals(self, fevals_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None, return_split: bool = True):
         """Get the curve over function evaluations.
 
         Args:
             fevals_range: the range of function evaluations.
             dist: the distribution, used for looking up indices. Ignored in ``Baseline``. Defaults to None.
             confidence_level: confidence level for the confidence interval. Ignored in ``Baseline``. Defaults to None.
+            return_split: whether to return the arrays split at the real / fictional point. Defaults to True.
 
         Returns:
             Two possible returns, for ``Baseline`` and ``Curve`` respectively:
@@ -155,13 +157,14 @@ class CurveBasis(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_curve_over_time(self, time_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None):
+    def get_curve_over_time(self, time_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None, return_split: bool = True):
         """Get the curve over time.
 
         Args:
             time_range: the range of time.
             dist: the distribution, used for looking up indices. Ignored in ``Baseline``. Defaults to None.
             confidence_level: confidence level for the confidence interval. Ignored in ``Baseline``. Defaults to None.
+            return_split: whether to return the arrays split at the real / fictional point. Defaults to True.
 
         Returns:
             Two possible returns, for ``Baseline`` and ``Curve`` respectively:
@@ -537,9 +540,9 @@ class StochasticOptimizationAlgorithm(Curve):
             ), f"Unequal arrays: {curve_upper_err}, {curve_upper_err_real}"
 
     def get_curve(  # noqa: D102
-        self, range: np.ndarray, x_type: str, dist: np.ndarray = None, confidence_level: float = None
+        self, range: np.ndarray, x_type: str, dist: np.ndarray = None, confidence_level: float = None, return_split: bool = True
     ):
-        return super().get_curve(range, x_type, dist, confidence_level)
+        return super().get_curve(range, x_type, dist, confidence_level, return_split=return_split)
 
     def _get_matching_feval_indices_in_range(self, fevals_range: np.ndarray) -> np.ndarray:
         """Get a mask of where the fevals range matches with the data."""
@@ -615,7 +618,7 @@ class StochasticOptimizationAlgorithm(Curve):
         return fevals, masked_values
 
     def get_curve_over_fevals(  # noqa: D102
-        self, fevals_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None
+        self, fevals_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None, return_split: bool = True
     ):
         fevals, masked_values = self._get_curve_over_fevals_values_in_range(fevals_range)
 
@@ -687,10 +690,12 @@ class StochasticOptimizationAlgorithm(Curve):
         assert np.all(~np.isnan(curve_lower_err)), f"NaNs at {np.nonzero(np.isnan(curve_lower_err))[0]}"
         assert np.all(~np.isnan(curve_upper_err)), f"NaNs at {np.nonzero(np.isnan(curve_upper_err))[0]}"
 
-        # return the curves split in real and fictional
-        return self._get_curve_split_real_fictional_parts(
-            real_stopping_point_index + 1, fevals_range, curve, curve_lower_err, curve_upper_err
-        )
+        if return_split:
+            # return the curves split in real and fictional
+            return self._get_curve_split_real_fictional_parts(
+                real_stopping_point_index + 1, fevals_range, curve, curve_lower_err, curve_upper_err
+            )
+        return real_stopping_point_index + 1, fevals_range, curve, curve_lower_err, curve_upper_err
 
     def _get_curve_over_time_values_in_range(
         self, time_range: np.ndarray, return_1d=True
@@ -772,7 +777,7 @@ class StochasticOptimizationAlgorithm(Curve):
             return times, values, real_stopping_point_time, num_fevals, num_repeats
 
     def get_curve_over_time(  # noqa: D102
-        self, time_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None, use_bagging=True
+        self, time_range: np.ndarray, dist: np.ndarray = None, confidence_level: float = None, return_split: bool = True, use_bagging=True
     ):
         # check the distribution
         if dist is None:
@@ -856,9 +861,11 @@ class StochasticOptimizationAlgorithm(Curve):
             curve_lower_err[real_stopping_point_index:] = curve_lower_err[real_stopping_point_index]
             curve_upper_err[real_stopping_point_index:] = curve_upper_err[real_stopping_point_index]
 
-        return self._get_curve_split_real_fictional_parts(
-            real_stopping_point_index, time_range, curve, curve_lower_err, curve_upper_err
-        )
+        if return_split:
+            return self._get_curve_split_real_fictional_parts(
+                real_stopping_point_index, time_range, curve, curve_lower_err, curve_upper_err
+            )
+        return real_stopping_point_index, time_range, curve, curve_lower_err, curve_upper_err
 
     def get_split_times(  # noqa: D102
         self, range: np.ndarray, x_type: str, searchspace_stats: SearchspaceStatistics
