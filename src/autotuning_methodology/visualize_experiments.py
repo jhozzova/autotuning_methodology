@@ -833,10 +833,50 @@ class Visualize:
             vmin: float = plot.get("vmin", None)  # visual range lower limit
             if scope != "aggregate":
                 continue
-            if style != "line":
-                raise NotImplementedError(f"{scope} currently only supports 'line' as a style, not {style}")
+            if style != "line" and style != "head2head":
+                raise NotImplementedError(f"{scope} does currently not support {style}, create an issue to request it.")
+            if style == "head2head":
+                compare_at_relative_time = plot["comparison"]["relative_time"]
+                comparison_unit = plot["comparison"]["unit"]
+
+                # the comparison data will be a double nested dictionary of the strategy indices
+                comparison_data = dict()
+                for strategy_index_alpha in range(len(self.strategies)):
+                    comparison_data[strategy_index_alpha] = dict()
+                    for strategy_index_beta in range(len(self.strategies)):
+                        comparison_data[strategy_index_alpha][strategy_index_beta] = list()
+
+                # iterate over the searchspaces and strategies to get head2head data
+                for gpu_name in self.experiment["experimental_groups_defaults"]["gpus"]:
+                    for application_name in self.experiment["experimental_groups_defaults"]["applications_names"]:
+                        print(f" | visualizing head2head of {application_name} for {gpu_name}")
+
+                        # unpack the aggregation data
+                        _, strategies_curves, searchspace_stats, time_range, _ = aggregation_data[
+                            get_aggregation_data_key(gpu_name=gpu_name, application_name=application_name)
+                        ]
+
+                        # get the head2head comparison data
+                        comparison_data_ss = self.get_head2head_comparison_data(
+                            "time",
+                            compare_at_relative_time,
+                            comparison_unit,
+                            searchspace_stats,
+                            strategies_curves,
+                            time_range,
+                        )
+
+                        # for this searchspace, append each strategy's data to the comparison data
+                        for strategy_index_alpha in range(len(self.strategies)):
+                            for strategy_index_beta in range(len(self.strategies)):
+                                comparison_data[strategy_index_alpha][strategy_index_beta].append(
+                                    comparison_data_ss[strategy_index_alpha][strategy_index_beta]
+                                )
+
+                raise ValueError(comparison_data)
+
             # plot the aggregation
-            if continue_after_comparison or not (compare_baselines or compare_split_times):
+            if style == "line" and (continue_after_comparison or not (compare_baselines or compare_split_times)):
                 fig, axs = plt.subplots(
                     ncols=1, figsize=(7.5, 4.4), dpi=300
                 )  # if multiple subplots, pass the axis to the plot function with axs[0] etc.
@@ -1145,6 +1185,69 @@ class Visualize:
             print(f"Figure saved to {filename_path}")
         else:
             plt.show()
+
+    def get_head2head_comparison_data(
+        self,
+        x_type: str,
+        compare_at_relative_time: float,
+        comparison_unit: str,
+        searchspace_stats: SearchspaceStatistics,
+        strategies_curves: list[Curve],
+        x_axis_range: np.ndarray,
+    ):
+        """Gets the data for a head-to-head comparison of strategies.
+
+        Args:
+            x_type: the type of ``x_axis_range``.
+            compare_at_relative_time: the relative point in time to compare at, between 0.0 and 1.0.
+            comparison_unit: the unit to compare with, 'time' or 'objective'.
+            searchspace_stats: the Searchspace statistics object.
+            strategies_curves: the strategy curves to draw in the plot.
+            x_axis_range: the time or function evaluations range to plot on.
+
+        Returns:
+            A doubly-nested dictionary with strategy names as keys and how much better outer performs relative to inner.
+        """
+        comparison_point = x_axis_range[-1] * compare_at_relative_time
+        comparison_data = dict()
+        confidence_level = 0.95 # irrelevant because the confidence intervals are not used
+        dist = searchspace_stats.objective_performances_total_sorted                  
+        for strategy_index_alpha, strategy_alpha in enumerate(self.strategies):
+            inner_comparison_data = dict()
+            strategy_curve_alpha = strategies_curves[strategy_index_alpha]
+            _, time_range_alpha, curve_alpha, _, _ = strategy_curve_alpha.get_curve(x_axis_range, x_type, dist=dist, confidence_level=confidence_level, return_split=False)
+
+            # find the index of the closest time and performance to the comparison point
+            closest_index_alpha = np.argmin(np.abs(time_range_alpha - comparison_point))
+            time_at_comparison_alpha = time_range_alpha[closest_index_alpha]
+            performance_at_comparison_alpha = curve_alpha[closest_index_alpha]
+
+            # compare against all other strategies
+            for strategy_index_beta, strategy_beta in enumerate(self.strategies):
+                if strategy_index_alpha == strategy_index_beta:
+                    inner_comparison_data[strategy_index_beta] = np.nan
+                    continue
+                strategy_curve_beta = strategies_curves[strategy_index_beta]
+                _, time_range_beta, curve_beta, _, _ = strategy_curve_beta.get_curve(x_axis_range, x_type, dist=dist, confidence_level=confidence_level, return_split=False)
+
+                # calculate the relative difference between the two strategies at the comparison point
+                if comparison_unit == "time":
+                    # given the performance at `compare_at_relative_time`, how much longer does strategy beta take to get to the same performance compared to strategy alpha?
+                    closest_index_beta = np.argmin(np.abs(curve_beta - performance_at_comparison_alpha))
+                    time_at_comparison_beta = time_range_beta[closest_index_beta]
+                    # outer takes X% of the time inner takes to reach the same performance
+                    inner_comparison_data[strategy_index_beta] = (time_at_comparison_alpha / time_at_comparison_beta) * 100
+                elif comparison_unit == "objective":
+                    # given the time at `compare_at_relative_time`, how much worse is the objective value of strategy beta at that moment compared to strategy alpha?
+                    closest_index_beta = np.argmin(np.abs(time_range_beta - time_at_comparison_alpha))
+                    performance_at_comparison_beta = curve_beta[closest_index_beta]
+                    # outer performance is X% of inner at the same time
+                    inner_comparison_data[strategy_index_beta] = (performance_at_comparison_alpha / performance_at_comparison_beta) * 100
+                else:
+                    raise ValueError(f"Invalid comparison unit: {comparison_unit}. Expected 'time' or 'objective'.")
+            
+            comparison_data[strategy_index_alpha] = inner_comparison_data
+        return comparison_data
 
     def plot_strategies(
         self,
