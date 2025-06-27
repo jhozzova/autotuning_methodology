@@ -845,7 +845,7 @@ class Visualize:
 
                 # convert the comparison data dictionary to a 2D numpy array of means
                 comparison_data = np.array(
-                    [[np.mean(comparison_data_raw[strategy1][strategy2]) for strategy2 in comparison_data_raw[strategy1].keys()]
+                    [[np.nanmean(comparison_data_raw[strategy1][strategy2]) for strategy2 in comparison_data_raw[strategy1].keys()]
                         for strategy1 in comparison_data_raw.keys()]
                 ).transpose()
 
@@ -859,20 +859,20 @@ class Visualize:
                 if not save_figs:
                     fig.suptitle(title)
 
-                # set the x and y labels
-                if comparison_unit == "time":
-                    ax.set_xlabel("How much time do these strategies take...")
-                elif comparison_unit == "objective":
-                    ax.set_xlabel("How much objective value do these strategies achieve...")
-                ax.set_ylabel("...relative to these strategies")
-                ax.xaxis.set_label_position('top') 
+                # # set the x and y labels
+                # if comparison_unit == "time":
+                #     ax.set_xlabel("How much time do these strategies take...")
+                # elif comparison_unit == "objective":
+                #     ax.set_xlabel("How much objective value do these strategies achieve...")
+                # ax.set_ylabel("...relative to these strategies?")
+                # ax.xaxis.set_label_position('top') 
 
                 # set the x and y ticks
                 x_ticks = list(comparison_data_raw.keys())
                 y_ticks = list(comparison_data_raw.keys())
                 # Show all ticks and label them with the respective list entries
                 ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=-10, ha="right", rotation_mode="anchor")
-                ax.set_yticks(range(len(y_ticks)), labels=y_ticks)
+                ax.set_yticks(range(len(y_ticks)), labels=y_ticks, rotation=-30, ha="right", rotation_mode="anchor")
                 ax.xaxis.tick_top()
 
                 # set the color map
@@ -882,21 +882,33 @@ class Visualize:
                     """Normalize a color value to fit in the 0-1 range."""
                     return (v - vmin) / (vmax - vmin)
 
-                cmap = LinearSegmentedColormap.from_list(
-                    "head2head_colormap",
-                    [
-                        (norm_color_val(vmin), "darkgreen"),
-                        (norm_color_val(100.0), "greenyellow"),
-                        (norm_color_val(200.0), "orange"),
-                        (norm_color_val(500.0), "red"),
-                        (norm_color_val(vmax), "darkred"),
-                        # (norm_color_val(vmax), "black"),
-                    ],
-                )
+                if comparison_unit == "time":
+                    cmap = LinearSegmentedColormap.from_list(
+                        "head2head_colormap",
+                        [
+                            (norm_color_val(vmin), "darkgreen"),
+                            (norm_color_val(100.0), "greenyellow"),
+                            (norm_color_val(200.0), "orange"),
+                            (norm_color_val(500.0), "red"),
+                            (norm_color_val(vmax), "darkred"),
+                            # (norm_color_val(vmax), "black"),
+                        ],
+                    )
+                elif comparison_unit == "objective":
+                    cmap = LinearSegmentedColormap.from_list(
+                        "head2head_colormap",
+                        [
+                            (norm_color_val(vmin), "darkred"),
+                            (norm_color_val(80.0), "yellow"),
+                            (norm_color_val(100.0), "greenyellow"),
+                            (norm_color_val(200.0), "green"),
+                            (norm_color_val(vmax), "darkgreen"),
+                        ],
+                    )
 
                 # if there are any values above the vmax, warn
                 if np.any(comparison_data > vmax):
-                    warn(f"There are values above the vmax ({vmax}) in the comparison data: {comparison_data[comparison_data > vmax]}, these are clipped")
+                    warnings.warn(f"There are values above the vmax ({vmax}) in the comparison data: {comparison_data[comparison_data > vmax]}, these are clipped")
                 # clip the comparison data to the vmin-vmax range
                 comparison_data_clipped = np.clip(comparison_data, vmin, vmax)
 
@@ -922,10 +934,12 @@ class Visualize:
                 if cmin != vmin or cmax != vmax:
                     cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                     cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
-                cbar.ax.set_ylabel("Difference in time to same objective value (lower is better)", rotation=-90, va="bottom")
-                if comparison_unit == "objective":
-                    # TODO implement the case for comparison_unit == "objective", check whether it works correctly independent of optimization direction
-                    raise NotImplementedError("Objective value comparison not implemented yet")
+                if comparison_unit == "time":
+                    cbar.ax.set_ylabel("Percentage difference in time to same objective value (lower is better)", rotation=-90, va="bottom")
+                elif comparison_unit == "objective":
+                    cbar.ax.set_ylabel("Percentage difference in objective value at same time (higher is better)", rotation=-90, va="bottom")
+                else:
+                    raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
                 # loop over data dimensions and create text annotations.
                 for i in range(len(x_ticks)):
@@ -938,7 +952,7 @@ class Visualize:
                 # finalize the figure and save or display it
                 fig.tight_layout()
                 if save_figs:
-                    filename_path = Path(self.plot_filename_prefix) / "head2head_comparison"
+                    filename_path = Path(self.plot_filename_prefix) / f"head2head_comparison_{comparison_unit}"
                     fig.savefig(filename_path, dpi=300, bbox_inches="tight", pad_inches=0.01)
                     print(f"Figure saved to {filename_path}")
                 else:
@@ -1318,6 +1332,7 @@ class Visualize:
         comparison_point = x_axis_range[-1] * compare_at_relative_time
         comparison_data = dict()
         confidence_level = 0.95 # irrelevant because the confidence intervals are not used
+        minimization = searchspace_stats.minimization
         dist = searchspace_stats.objective_performances_total_sorted                  
         for strategy_index_alpha, strategy_alpha in enumerate(self.strategies):
             inner_comparison_data = dict()
@@ -1329,6 +1344,11 @@ class Visualize:
             time_at_comparison_alpha = time_range_alpha[closest_index_alpha]
             performance_at_comparison_alpha = curve_alpha[closest_index_alpha]
 
+            absolute_optimum = searchspace_stats.total_performance_absolute_optimum()
+            median = searchspace_stats.total_performance_median()
+            normalize = lambda val: (val - median) / (absolute_optimum - median)
+            performance_at_comparison_alpha_norm = normalize(performance_at_comparison_alpha)
+
             # compare against all other strategies
             for strategy_index_beta, strategy_beta in enumerate(self.strategies):
                 if strategy_index_alpha == strategy_index_beta:
@@ -1339,17 +1359,34 @@ class Visualize:
 
                 # calculate the relative difference between the two strategies at the comparison point
                 if comparison_unit == "time":
-                    # given the performance at `compare_at_relative_time`, how much longer does strategy beta take to get to the same performance compared to strategy alpha?
-                    closest_index_beta = np.argmin(np.abs(curve_beta - performance_at_comparison_alpha))
+                    # given the performance at `compare_at_relative_time`, what is the index of the first time that strategy beta reaches at least the same performance?
+                    index_matching = np.argwhere(curve_beta <= performance_at_comparison_alpha) if minimization else np.argwhere(curve_beta >= performance_at_comparison_alpha)
+                    if index_matching.size == 0:
+                        # if strategy beta never reaches the performance of strategy alpha, we cannot compare
+                        inner_comparison_data[strategy_index_beta] = np.nan
+                        continue
+                    # get the time at which strategy beta reaches the performance of strategy alpha
+                    closest_index_beta = index_matching[0][0]  # take the first match
                     time_at_comparison_beta = time_range_beta[closest_index_beta]
-                    # outer takes X% of the time inner takes to reach the same performance
-                    inner_comparison_data[strategy_index_beta] = (time_at_comparison_alpha / time_at_comparison_beta) * 100
+                
+                    # given the performance at `compare_at_relative_time`, how much longer does strategy beta take to get to the same performance compared to strategy alpha? (lower is better)
+                    # closest_index_beta = np.argmin(np.abs(curve_beta - performance_at_comparison_alpha))
+                    # time_at_comparison_beta = time_range_beta[closest_index_beta]
+                    # outer takes X% of the time inner takes to reach the same performance (100%+percentage change)
+                    percentage_change = (time_at_comparison_alpha - time_at_comparison_beta) / abs(time_at_comparison_beta) * 100
+                    inner_comparison_data[strategy_index_beta] = 100 + percentage_change
                 elif comparison_unit == "objective":
-                    # given the time at `compare_at_relative_time`, how much worse is the objective value of strategy beta at that moment compared to strategy alpha?
+                    # given the time at `compare_at_relative_time`, how much worse is the objective value of strategy beta at that moment compared to strategy alpha? (higher is better)
                     closest_index_beta = np.argmin(np.abs(time_range_beta - time_at_comparison_alpha))
                     performance_at_comparison_beta = curve_beta[closest_index_beta]
-                    # outer performance is X% of inner at the same time
-                    inner_comparison_data[strategy_index_beta] = (performance_at_comparison_alpha / performance_at_comparison_beta) * 100
+                    performance_at_comparison_beta_norm = normalize(performance_at_comparison_beta)
+
+                    # percentage_change = (performance_at_comparison_beta - performance_at_comparison_alpha) / abs(performance_at_comparison_beta) * 100
+                    # if not minimization:
+                    #     percentage_change = -percentage_change
+
+                    percentage_change_norm = (performance_at_comparison_beta_norm - performance_at_comparison_alpha_norm) / abs(performance_at_comparison_beta_norm) * 100
+                    inner_comparison_data[strategy_index_beta] = 100 + percentage_change_norm
                 else:
                     raise ValueError(f"Invalid comparison unit: {comparison_unit}. Expected 'time' or 'objective'.")
             
