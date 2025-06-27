@@ -861,17 +861,19 @@ class Visualize:
 
                 # set the x and y labels
                 if comparison_unit == "time":
-                    ax.set_xlabel("how much time do these strategies take...")
+                    ax.set_xlabel("How much time do these strategies take...")
                 elif comparison_unit == "objective":
-                    ax.set_xlabel("how much objective value do these strategies achieve...")
+                    ax.set_xlabel("How much objective value do these strategies achieve...")
                 ax.set_ylabel("...relative to these strategies")
+                ax.xaxis.set_label_position('top') 
 
                 # set the x and y ticks
                 x_ticks = list(comparison_data_raw.keys())
                 y_ticks = list(comparison_data_raw.keys())
                 # Show all ticks and label them with the respective list entries
-                ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=15, ha="right", rotation_mode="anchor")
+                ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=-10, ha="right", rotation_mode="anchor")
                 ax.set_yticks(range(len(y_ticks)), labels=y_ticks)
+                ax.xaxis.tick_top()
 
                 # set the color map
                 vmin = 0.0
@@ -931,7 +933,6 @@ class Visualize:
                         number = comparison_data[i, j]
                         if np.isnan(number):
                             continue
-                        print(f"{j},{i}: {round(number, 1)}%")
                         text = ax.text(j, i, f"{round(number, 1)}%", ha="center", va="center", color="white")
 
                 # finalize the figure and save or display it
@@ -942,8 +943,6 @@ class Visualize:
                     print(f"Figure saved to {filename_path}")
                 else:
                     plt.show()
-                
-                raise ValueError(comparison_data)
 
             # plot the aggregation
             if style == "line" and (continue_after_comparison or not (compare_baselines or compare_split_times)):
