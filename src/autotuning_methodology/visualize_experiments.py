@@ -840,39 +840,69 @@ class Visualize:
                 comparison_unit = plot["comparison"]["unit"]
 
                 # the comparison data will be a double nested dictionary of the strategy indices
-                comparison_data = dict()
-                for strategy_index_alpha in range(len(self.strategies)):
-                    comparison_data[strategy_index_alpha] = dict()
-                    for strategy_index_beta in range(len(self.strategies)):
-                        comparison_data[strategy_index_alpha][strategy_index_beta] = list()
+                comparison_data_raw = self.get_head2head_comparison_data(aggregation_data, compare_at_relative_time, comparison_unit)
 
-                # iterate over the searchspaces and strategies to get head2head data
-                for gpu_name in self.experiment["experimental_groups_defaults"]["gpus"]:
-                    for application_name in self.experiment["experimental_groups_defaults"]["applications_names"]:
-                        print(f" | visualizing head2head of {application_name} for {gpu_name}")
+                # convert the comparison data dictionary to a 2D numpy array of means
+                comparison_data = np.array(
+                    [[np.mean(comparison_data_raw[strategy1][strategy2]) for strategy2 in comparison_data_raw[strategy1].keys()]
+                        for strategy1 in comparison_data_raw.keys()]
+                )
 
-                        # unpack the aggregation data
-                        _, strategies_curves, searchspace_stats, time_range, _ = aggregation_data[
-                            get_aggregation_data_key(gpu_name=gpu_name, application_name=application_name)
-                        ]
+                # set up the plot
+                fig, axs = plt.subplots(ncols=1, figsize=(8, 6), dpi=300)
+                if not hasattr(axs, "__len__"):
+                    axs = [axs]
+                ax = axs[0]
+                title = f"Head-to-head comparison of strategies at {compare_at_relative_time} relative time"
+                fig.canvas.manager.set_window_title(title)
+                if not save_figs:
+                    fig.suptitle(title)
 
-                        # get the head2head comparison data
-                        comparison_data_ss = self.get_head2head_comparison_data(
-                            "time",
-                            compare_at_relative_time,
-                            comparison_unit,
-                            searchspace_stats,
-                            strategies_curves,
-                            time_range,
-                        )
+                # set the x and y labels
+                if comparison_unit == "time":
+                    ax.set_xlabel("how much time do these strategies take...")
+                elif comparison_unit == "objective":
+                    ax.set_xlabel("how much objective value do these strategies achieve...")
+                ax.set_ylabel("...relative to these strategies")
 
-                        # for this searchspace, append each strategy's data to the comparison data
-                        for strategy_index_alpha in range(len(self.strategies)):
-                            for strategy_index_beta in range(len(self.strategies)):
-                                comparison_data[strategy_index_alpha][strategy_index_beta].append(
-                                    comparison_data_ss[strategy_index_alpha][strategy_index_beta]
-                                )
+                # set the x and y ticks
+                x_ticks = list(comparison_data_raw.keys())
+                y_ticks = list(comparison_data_raw.keys())
+                # Show all ticks and label them with the respective list entries
+                ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=15, ha="right", rotation_mode="anchor")
+                ax.set_yticks(range(len(y_ticks)), labels=y_ticks)
 
+                # plot the comparison data
+                im = ax.imshow(
+                    comparison_data,
+                    vmin=0.0,
+                    aspect="auto",
+                )
+                cbar = ax.figure.colorbar(im, ax=ax)
+                cbar.ax.set_ylabel("Difference in time to same objective value (lower is better)", rotation=-90, va="bottom")
+                if comparison_unit == "objective":
+                    # TODO implement the case for comparison_unit == "objective", check whether it works correctly independent of optimization direction
+                    raise NotImplementedError("Objective value comparison not implemented yet")
+
+                # loop over data dimensions and create text annotations.
+                for i in range(len(x_ticks)):
+                    for j in range(len(y_ticks)):
+                        number = comparison_data[i, j]
+                        if np.isnan(number):
+                            continue
+                        print(f"{j},{i}: {round(number, 1)}%")
+                        text = ax.text(j, i, f"{round(number, 1)}%", ha="center", va="center", color="black")
+                        print(text)
+
+                # finalize the figure and save or display it
+                fig.tight_layout()
+                if save_figs:
+                    filename_path = Path(self.plot_filename_prefix) / "head2head_comparison"
+                    fig.savefig(filename_path, dpi=300, bbox_inches="tight", pad_inches=0.01)
+                    print(f"Figure saved to {filename_path}")
+                else:
+                    plt.show()
+                
                 raise ValueError(comparison_data)
 
             # plot the aggregation
@@ -1186,7 +1216,45 @@ class Visualize:
         else:
             plt.show()
 
-    def get_head2head_comparison_data(
+    def get_head2head_comparison_data(self, aggregation_data: dict, compare_at_relative_time: float, comparison_unit: str) -> dict:
+        """Gets the data for a head-to-head comparison of strategies across all searchspaces."""
+        # the comparison data will be a double nested dictionary of the strategy indices
+        comparison_data = dict()
+        for strategy_alpha in self.strategies:
+            comparison_data[strategy_alpha['display_name']] = dict()
+            for strategy_beta in self.strategies:
+                comparison_data[strategy_alpha['display_name']][strategy_beta['display_name']] = list()
+
+        # iterate over the searchspaces and strategies to get head2head data
+        for gpu_name in self.experiment["experimental_groups_defaults"]["gpus"]:
+            for application_name in self.experiment["experimental_groups_defaults"]["applications_names"]:
+                print(f" | visualizing head2head of {application_name} for {gpu_name}")
+
+                # unpack the aggregation data
+                _, strategies_curves, searchspace_stats, time_range, _ = aggregation_data[
+                    get_aggregation_data_key(gpu_name=gpu_name, application_name=application_name)
+                ]
+
+                # get the head2head comparison data
+                comparison_data_ss = self.get_head2head_comparison_data_searchspace(
+                    "time",
+                    compare_at_relative_time,
+                    comparison_unit,
+                    searchspace_stats,
+                    strategies_curves,
+                    time_range,
+                )
+
+                # for this searchspace, append each strategy's data to the comparison data
+                for strategy_index_alpha, strategy_alpha in enumerate(self.strategies):
+                    for strategy_index_beta, strategy_beta in enumerate(self.strategies):
+                        comparison_data[strategy_alpha['display_name']][strategy_beta['display_name']].append(
+                            comparison_data_ss[strategy_index_alpha][strategy_index_beta]
+                        )
+
+        return comparison_data
+
+    def get_head2head_comparison_data_searchspace(
         self,
         x_type: str,
         compare_at_relative_time: float,
@@ -1194,8 +1262,8 @@ class Visualize:
         searchspace_stats: SearchspaceStatistics,
         strategies_curves: list[Curve],
         x_axis_range: np.ndarray,
-    ):
-        """Gets the data for a head-to-head comparison of strategies.
+    ) -> dict:
+        """Gets the data for a head-to-head comparison of strategies on a specific searchspace.
 
         Args:
             x_type: the type of ``x_axis_range``.
