@@ -639,6 +639,8 @@ class StochasticOptimizationAlgorithm(Curve):
                 # get the confidence interval
                 indices_lower_err, indices_upper_err = self.get_confidence_interval(indices, confidence_level)
                 indices_lower_err, indices_upper_err = indices_lower_err.astype(int), indices_upper_err.astype(int)
+                indices_lower_err = np.clip(indices_lower_err, a_min=0, a_max=dist.shape[0] - 1)
+                indices_upper_err = np.clip(indices_upper_err, a_min=0, a_max=dist.shape[0] - 1)
             # obtain the curves by looking up the associated values
             curve = dist[indices_mean]
             curve_lower_err = dist[indices_lower_err]
