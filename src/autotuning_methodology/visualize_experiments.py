@@ -5,6 +5,7 @@ from __future__ import annotations  # for correct nested type hints e.g. list[st
 import warnings
 from collections import defaultdict
 from pathlib import Path
+from math import ceil
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -846,7 +847,7 @@ class Visualize:
                 comparison_data = np.array(
                     [[np.mean(comparison_data_raw[strategy1][strategy2]) for strategy2 in comparison_data_raw[strategy1].keys()]
                         for strategy1 in comparison_data_raw.keys()]
-                )
+                ).transpose()
 
                 # set up the plot
                 fig, axs = plt.subplots(ncols=1, figsize=(8, 6), dpi=300)
@@ -872,13 +873,53 @@ class Visualize:
                 ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=15, ha="right", rotation_mode="anchor")
                 ax.set_yticks(range(len(y_ticks)), labels=y_ticks)
 
+                # set the color map
+                vmin = 0.0
+                vmax = 1000.0
+                def norm_color_val(v):
+                    """Normalize a color value to fit in the 0-1 range."""
+                    return (v - vmin) / (vmax - vmin)
+
+                cmap = LinearSegmentedColormap.from_list(
+                    "head2head_colormap",
+                    [
+                        (norm_color_val(vmin), "darkgreen"),
+                        (norm_color_val(100.0), "greenyellow"),
+                        (norm_color_val(200.0), "orange"),
+                        (norm_color_val(500.0), "red"),
+                        (norm_color_val(vmax), "darkred"),
+                        # (norm_color_val(vmax), "black"),
+                    ],
+                )
+
+                # if there are any values above the vmax, warn
+                if np.any(comparison_data > vmax):
+                    warn(f"There are values above the vmax ({vmax}) in the comparison data: {comparison_data[comparison_data > vmax]}, these are clipped")
+                # clip the comparison data to the vmin-vmax range
+                comparison_data_clipped = np.clip(comparison_data, vmin, vmax)
+
                 # plot the comparison data
                 im = ax.imshow(
-                    comparison_data,
-                    vmin=0.0,
+                    comparison_data_clipped,
+                    vmin=vmin,
+                    vmax=vmax,
                     aspect="auto",
+                    cmap=cmap,
                 )
+
+                # set the colorbar
+                # cmin = np.nanmin(comparison_data_clipped)
+                cmin = vmin     # always show 0.0 as the start
+                max_val = np.nanmax(comparison_data_clipped)
+                # round to the nearest 100
+                cmax = round(ceil(max_val), -2)
+                if cmax < max_val:
+                    cmax += 100  # ensure the colorbar max is above the max value
+                cnum = round(cmax / 100) + 1
                 cbar = ax.figure.colorbar(im, ax=ax)
+                if cmin != vmin or cmax != vmax:
+                    cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
+                    cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                 cbar.ax.set_ylabel("Difference in time to same objective value (lower is better)", rotation=-90, va="bottom")
                 if comparison_unit == "objective":
                     # TODO implement the case for comparison_unit == "objective", check whether it works correctly independent of optimization direction
@@ -891,8 +932,7 @@ class Visualize:
                         if np.isnan(number):
                             continue
                         print(f"{j},{i}: {round(number, 1)}%")
-                        text = ax.text(j, i, f"{round(number, 1)}%", ha="center", va="center", color="black")
-                        print(text)
+                        text = ax.text(j, i, f"{round(number, 1)}%", ha="center", va="center", color="white")
 
                 # finalize the figure and save or display it
                 fig.tight_layout()
