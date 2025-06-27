@@ -871,7 +871,7 @@ class Visualize:
                 x_ticks = list(comparison_data_raw.keys())
                 y_ticks = list(comparison_data_raw.keys())
                 # Show all ticks and label them with the respective list entries
-                ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=-10, ha="right", rotation_mode="anchor")
+                ax.set_xticks(range(len(x_ticks)), labels=x_ticks, rotation=-15, ha="right", rotation_mode="anchor")
                 ax.set_yticks(range(len(y_ticks)), labels=y_ticks, rotation=-30, ha="right", rotation_mode="anchor")
                 ax.xaxis.tick_top()
 
@@ -890,8 +890,8 @@ class Visualize:
                             (norm_color_val(100.0), "greenyellow"),
                             (norm_color_val(200.0), "orange"),
                             (norm_color_val(500.0), "red"),
-                            (norm_color_val(vmax), "darkred"),
-                            # (norm_color_val(vmax), "black"),
+                            (norm_color_val(800.0), "darkred"),
+                            (norm_color_val(vmax), "black"),
                         ],
                     )
                 elif comparison_unit == "objective":
@@ -935,19 +935,29 @@ class Visualize:
                     cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                     cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                 if comparison_unit == "time":
-                    cbar.ax.set_ylabel("Percentage difference in time to same objective value (lower is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(f"Percentage difference in time to same objective value{chr(10) if len(y_ticks) < 10 else ' '}(lower is better)", rotation=-90, va="bottom")
                 elif comparison_unit == "objective":
-                    cbar.ax.set_ylabel("Percentage difference in objective value at same time (higher is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(f"Percentage difference in objective value at same time{chr(10) if len(y_ticks) < 10 else ' '}(higher is better)", rotation=-90, va="bottom")
                 else:
                     raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
-                # loop over data dimensions and create text annotations.
+                # loop over data dimensions and create text annotations
                 for i in range(len(x_ticks)):
                     for j in range(len(y_ticks)):
                         number = comparison_data[i, j]
                         if np.isnan(number):
                             continue
-                        text = ax.text(j, i, f"{round(number, 1)}%", ha="center", va="center", color="white")
+                        text = ax.text(j, i, f"{round(number, 1) if number < 100 else round(number)}%", ha="center", va="center", color="white")
+
+                # plot the averages per strategy as labels under the heatmap
+                averages = np.nanmean(comparison_data, axis=0)
+                # add "mean" before the averages
+                ax.text(-0.5, len(y_ticks), "Mean:", ha="right", va="center", color="black", fontsize=10)
+                for i, avg in enumerate(averages):
+                    ax.text(
+                        i, len(y_ticks), f"{round(avg, 1) if avg < 100 else round(avg)}%", ha="center", va="center", color="black"
+                    )
+                print(f"Averages per strategy at {compare_at_relative_time} relative time: {[(s, a) for s, a in zip(x_ticks, averages)]}")
 
                 # finalize the figure and save or display it
                 fig.tight_layout()
