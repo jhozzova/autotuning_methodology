@@ -57,6 +57,18 @@
     },
     "search_strategies": [
         {
+            "name": "firefly_constrained",
+            "search_method": "firefly_algorithm",
+            "search_method_hyperparameters": [
+                {
+                    "name": "constraint_aware",
+                    "value": true
+                }
+            ],
+            "display_name": "KT Firefly",
+            "autotuner": "KernelTuner"
+        },
+        {
             "name": "genetic_algorithm_constrained",
             "search_method": "genetic_algorithm",
             "search_method_hyperparameters": [
@@ -65,7 +77,7 @@
                     "value": true
                 }
             ],
-            "display_name": "KT Genetic Algorithm",
+            "display_name": "KT GA",
             "autotuner": "KernelTuner"
         },
         {
@@ -89,7 +101,7 @@
                     "value": true
                 }
             ],
-            "display_name": "KT Simulated Annealing",
+            "display_name": "KT SA",
             "autotuner": "KernelTuner"
         },
         {
@@ -105,7 +117,7 @@
                     "value": true
                 }
             ],
-            "display_name": "pyATF Simulated Annealing",
+            "display_name": "pyATF SA",
             "autotuner": "KernelTuner"
         },
         {
@@ -137,7 +149,7 @@
                     "value": true
                 }
             ],
-            "display_name": "pyATF Differential Evolution",
+            "display_name": "pyATF DE",
             "autotuner": "KernelTuner"
         },
         {
@@ -228,8 +240,17 @@
             },
             {
                 "scope": "aggregate",
+                "style": "head2head",
+                "comparison": {
+                    "unit": "time",
+                    "relative_time": 0.5
+                }
+            },
+            {
+                "scope": "aggregate",
                 "style": "line",
-                "ylabel": "Aggregate performance relative to baseline"
+                "ylabel": "Aggregate performance relative to baseline",
+                "vmin": -4.0
             }
         ],
         "resolution": 1000.0,

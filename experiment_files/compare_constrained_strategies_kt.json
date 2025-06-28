@@ -77,8 +77,9 @@
                     "value": false
                 }
             ],
-            "display_name": "Firefly constrained (non-constrained)",
-            "autotuner": "KernelTuner"
+            "display_name": "Firefly non-constrained",
+            "autotuner": "KernelTuner",
+            "color_parent": "firefly_constrained"
         },
         {
             "name": "genetic_algorithm_constrained",
@@ -89,7 +90,7 @@
                     "value": true
                 }
             ],
-            "display_name": "Genetic Algorithm constrained",
+            "display_name": "GA constrained",
             "autotuner": "KernelTuner"
         },
         {
@@ -101,7 +102,7 @@
                     "value": false
                 }
             ],
-            "display_name": "Genetic Algorithm non-constrained",
+            "display_name": "GA non-constrained",
             "autotuner": "KernelTuner",
             "color_parent": "genetic_algorithm_constrained"
         },
@@ -139,11 +140,11 @@
                     "value": true
                 }
             ],
-            "display_name": "Simulated Annealing constrained",
+            "display_name": "SA constrained",
             "autotuner": "KernelTuner"
         },
         {
-            "name": "simulated_annealing_non_constrained",
+            "name": "simulated_annealing_non_constrained_2",
             "search_method": "simulated_annealing",
             "search_method_hyperparameters": [
                 {
@@ -151,7 +152,7 @@
                     "value": false
                 }
             ],
-            "display_name": "Simulated Annealing non-constrained",
+            "display_name": "SA non-constrained",
             "autotuner": "KernelTuner",
             "color_parent": "simulated_annealing_constrained"
         }
@@ -214,6 +215,14 @@
                 "cnum": 10,
                 "include_y_labels": false,
                 "include_colorbar": true
+            },
+            {
+                "scope": "aggregate",
+                "style": "head2head",
+                "comparison": {
+                    "unit": "time",
+                    "relative_time": 0.5
+                }
             },
             {
                 "scope": "aggregate",
