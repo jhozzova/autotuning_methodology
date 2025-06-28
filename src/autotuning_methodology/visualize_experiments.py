@@ -843,6 +843,13 @@ class Visualize:
                 # the comparison data will be a double nested dictionary of the strategy indices
                 comparison_data_raw = self.get_head2head_comparison_data(aggregation_data, compare_at_relative_time, comparison_unit)
 
+                # if more than half of the comparisons between two strategies are NaN, set all to NaN
+                for strategy1 in comparison_data_raw.keys():
+                    for strategy2 in comparison_data_raw[strategy1].keys():
+                        comparison = comparison_data_raw[strategy1][strategy2]
+                        if len([v for v in comparison if np.isnan(v)]) > ceil(0.5 * len(comparison)):
+                            comparison_data_raw[strategy1][strategy2] = [np.nan] * len(comparison)
+
                 # convert the comparison data dictionary to a 2D numpy array of means
                 comparison_data = np.array(
                     [[np.nanmean(comparison_data_raw[strategy1][strategy2]) for strategy2 in comparison_data_raw[strategy1].keys()]
@@ -971,7 +978,7 @@ class Visualize:
             # plot the aggregation
             if style == "line" and (continue_after_comparison or not (compare_baselines or compare_split_times)):
                 fig, axs = plt.subplots(
-                    ncols=1, figsize=(7.5, 4.4), dpi=300
+                    ncols=1, figsize=(6.8, 4.0), dpi=300
                 )  # if multiple subplots, pass the axis to the plot function with axs[0] etc.
                 if not hasattr(axs, "__len__"):
                     axs = [axs]
