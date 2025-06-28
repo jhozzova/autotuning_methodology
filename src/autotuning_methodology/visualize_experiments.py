@@ -364,7 +364,7 @@ class Visualize:
                         fig, axs = plt.subplots(
                             nrows=len(plot_y_value_types),
                             ncols=1,
-                            figsize=(8, 3.4 * len(plot_y_value_types)),
+                            figsize=(8, 4.2 * len(plot_y_value_types)),
                             sharex=True,
                             dpi=300,
                         )
@@ -935,9 +935,9 @@ class Visualize:
                     cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                     cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                 if comparison_unit == "time":
-                    cbar.ax.set_ylabel(f"Percentage difference in time to same objective value{chr(10) if len(y_ticks) < 10 else ' '}(lower is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(f"Percentage difference in time to same objective value{chr(10) if len(y_ticks) < 8 else ' '}(lower is better)", rotation=-90, va="bottom")
                 elif comparison_unit == "objective":
-                    cbar.ax.set_ylabel(f"Percentage difference in objective value at same time{chr(10) if len(y_ticks) < 10 else ' '}(higher is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(f"Percentage difference in objective value at same time{chr(10) if len(y_ticks) < 8 else ' '}(higher is better)", rotation=-90, va="bottom")
                 else:
                     raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
@@ -947,15 +947,15 @@ class Visualize:
                         number = comparison_data[i, j]
                         if np.isnan(number):
                             continue
-                        text = ax.text(j, i, f"{round(number, 1) if number < 100 else round(number)}%", ha="center", va="center", color="white")
+                        text = ax.text(j, i, f"{round(number, 1) if number < 100 else round(number)}%", ha="center", va="center", color="white" if number > 200 else "black", fontsize="small")
 
                 # plot the averages per strategy as labels under the heatmap
                 averages = np.nanmean(comparison_data, axis=0)
                 # add "mean" before the averages
-                ax.text(-0.5, len(y_ticks), "Mean:", ha="right", va="center", color="black", fontsize=10)
+                ax.text(-0.5, len(y_ticks)-0.2, "Mean:", ha="right", va="center", color="black", fontsize=10)
                 for i, avg in enumerate(averages):
                     ax.text(
-                        i, len(y_ticks), f"{round(avg, 1) if avg < 100 else round(avg)}%", ha="center", va="center", color="black"
+                        i, len(y_ticks)-0.2, f"{round(avg, 1) if avg < 100 else round(avg)}%", ha="center", va="center", color="black", fontsize="small"
                     )
                 print(f"Averages per strategy at {compare_at_relative_time} relative time: {[(s, a) for s, a in zip(x_ticks, averages)]}")
 
