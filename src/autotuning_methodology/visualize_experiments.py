@@ -726,16 +726,14 @@ class Visualize:
                             if hide_tick[i]:
                                 t.set_visible(False)
 
-                # loop over data dimensions and create text annotations
-                if annotate:
-                    # replace with looping over plot_data instead
-                    for i, j in np.ndindex(plot_data.shape):
-                    # for i in range(len(x_ticks)):
-                        # for j in range(len(y_ticks)):
-                        number = plot_data[i, j]
-                        if np.isnan(number):
-                            continue
-                        text = axs[0].text(j, i, f"{round(number, 2) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if (number > 0.5 or number < -2) else "black", fontsize="x-small")
+                    # loop over data dimensions and create text annotations
+                    if annotate:
+                        # replace with looping over plot_data instead
+                        for i, j in np.ndindex(plot_data.shape):
+                            number = plot_data[i, j]
+                            if np.isnan(number):
+                                continue
+                            text = axs[0].text(j, i, f"{round(number, 2) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if (number > 0.5 or number < -2) else "black", fontsize="x-small")
 
                     # finalize the figure and save or display it
                     fig.tight_layout()
