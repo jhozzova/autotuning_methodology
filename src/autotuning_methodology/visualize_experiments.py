@@ -1379,16 +1379,18 @@ class Visualize:
                     # given the performance at `compare_at_relative_time`, what is the index of the first time that strategy beta reaches at least the same performance?
                     index_matching = np.argwhere(curve_beta <= performance_at_comparison_alpha) if minimization else np.argwhere(curve_beta >= performance_at_comparison_alpha)
                     if index_matching.size == 0:
-                        # if strategy beta never reaches the performance of strategy alpha, we cannot compare
-                        inner_comparison_data[strategy_index_beta] = np.nan
-                        continue
-                    # get the time at which strategy beta reaches the performance of strategy alpha
-                    closest_index_beta = index_matching[0][0]  # take the first match
-                    time_at_comparison_beta = time_range_beta[closest_index_beta]
-                
-                    # given the performance at `compare_at_relative_time`, how much longer does strategy beta take to get to the same performance compared to strategy alpha? (lower is better)
-                    # closest_index_beta = np.argmin(np.abs(curve_beta - performance_at_comparison_alpha))
-                    # time_at_comparison_beta = time_range_beta[closest_index_beta]
+                        # if strategy beta never reaches the performance of strategy alpha, we cannot compare, instead we penalize it by taking 10x the last time value
+                        time_at_comparison_beta = time_range_beta[-1] * 10
+                        # inner_comparison_data[strategy_index_beta] = np.nan
+                        # continue
+                    else:
+                        # get the time at which strategy beta reaches the performance of strategy alpha
+                        closest_index_beta = index_matching[0][0]  # take the first match
+                        time_at_comparison_beta = time_range_beta[closest_index_beta]
+                    
+                        # given the performance at `compare_at_relative_time`, how much longer does strategy beta take to get to the same performance compared to strategy alpha? (lower is better)
+                        # closest_index_beta = np.argmin(np.abs(curve_beta - performance_at_comparison_alpha))
+                        # time_at_comparison_beta = time_range_beta[closest_index_beta]
                     # outer takes X% of the time inner takes to reach the same performance (100%+percentage change)
                     percentage_change = (time_at_comparison_alpha - time_at_comparison_beta) / abs(time_at_comparison_beta) * 100
                     inner_comparison_data[strategy_index_beta] = 100 + percentage_change
