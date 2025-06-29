@@ -709,7 +709,7 @@ class Visualize:
                             cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                             cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                         # cbar.set_label("Performance relative to baseline (0.0) and optimum (1.0)")
-                        cbar.set_label("Performance score")
+                        cbar.ax.set_ylabel("Performance score", rotation=-90, va="bottom")
 
                     # keep only non-overlapping ticks
                     max_ticks = 15
@@ -726,14 +726,16 @@ class Visualize:
                             if hide_tick[i]:
                                 t.set_visible(False)
 
-                    # loop over data dimensions and create text annotations
+                # loop over data dimensions and create text annotations
                 if annotate:
-                    for i in range(len(x_ticks)):
-                        for j in range(len(y_ticks)):
-                            number = plot_data[i, j]
-                            if np.isnan(number):
-                                continue
-                            text = axs[0].text(j, i, f"{round(number, 1) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if number > -2 else "black", fontsize="x-small")
+                    # replace with looping over plot_data instead
+                    for i, j in np.ndindex(plot_data.shape):
+                    # for i in range(len(x_ticks)):
+                        # for j in range(len(y_ticks)):
+                        number = plot_data[i, j]
+                        if np.isnan(number):
+                            continue
+                        text = axs[0].text(j, i, f"{round(number, 2) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if (number > 0.5 or number < -2) else "black", fontsize="x-small")
 
                     # finalize the figure and save or display it
                     fig.tight_layout()
@@ -953,9 +955,9 @@ class Visualize:
                     cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                     cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                 if comparison_unit == "time":
-                    cbar.ax.set_ylabel(f"Percentage difference in time to same objective value{chr(10) if len(y_ticks) < 8 else ' '}(lower is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(f"Time difference to same objective value (lower is better)", rotation=-90, va="bottom")
                 elif comparison_unit == "objective":
-                    cbar.ax.set_ylabel(f"Percentage difference in objective value at same time{chr(10) if len(y_ticks) < 8 else ' '}(higher is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(f"Objective value difference at same time (higher is better)", rotation=-90, va="bottom")
                 else:
                     raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
