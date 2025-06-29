@@ -393,6 +393,11 @@
                                     }
                                 }
                             },
+                            "annotate": {
+                                "description": "Whether to annotate the heatmaps with the values in their cells.",
+                                "type": "boolean",
+                                "default": true
+                            },
                             "include_y_labels": {
                                 "description": "Whether to show the y-axis labels on the heatmap. Displayed if not set.",
                                 "type": "boolean"

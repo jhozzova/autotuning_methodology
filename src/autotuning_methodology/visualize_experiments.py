@@ -417,6 +417,7 @@ class Visualize:
                 )
             plot_x_value_types: list[str] = plot["x_axis_value_types"]
             plot_y_value_types: list[str] = plot["y_axis_value_types"]
+            annotate: bool = plot.get("annotate", True)
             assert len(plot_x_value_types) == 1
             assert len(plot_y_value_types) == 1
             x_type = plot_x_value_types[0]
@@ -725,6 +726,15 @@ class Visualize:
                             if hide_tick[i]:
                                 t.set_visible(False)
 
+                    # loop over data dimensions and create text annotations
+                if annotate:
+                    for i in range(len(x_ticks)):
+                        for j in range(len(y_ticks)):
+                            number = plot_data[i, j]
+                            if np.isnan(number):
+                                continue
+                            text = axs[0].text(j, i, f"{round(number, 1) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if number > -2 else "black", fontsize="x-small")
+
                     # finalize the figure and save or display it
                     fig.tight_layout()
                     if save_figs:
@@ -839,6 +849,7 @@ class Visualize:
             if style == "head2head":
                 compare_at_relative_time = plot["comparison"]["relative_time"]
                 comparison_unit = plot["comparison"]["unit"]
+                annotate = plot.get("annotate", True)
 
                 # the comparison data will be a double nested dictionary of the strategy indices
                 comparison_data_raw = self.get_head2head_comparison_data(aggregation_data, compare_at_relative_time, comparison_unit)
@@ -949,12 +960,13 @@ class Visualize:
                     raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
                 # loop over data dimensions and create text annotations
-                for i in range(len(x_ticks)):
-                    for j in range(len(y_ticks)):
-                        number = comparison_data[i, j]
-                        if np.isnan(number):
-                            continue
-                        text = ax.text(j, i, f"{round(number, 1) if number < 100 else round(number)}%", ha="center", va="center", color="white" if number > 200 else "black", fontsize="small")
+                if annotate:
+                    for i in range(len(x_ticks)):
+                        for j in range(len(y_ticks)):
+                            number = comparison_data[i, j]
+                            if np.isnan(number):
+                                continue
+                            text = ax.text(j, i, f"{round(number, 1) if number < 100 else round(number)}%", ha="center", va="center", color="white" if (number > 200 or number < 50) else "black", fontsize="small")
 
                 # plot the averages per strategy as labels under the heatmap
                 averages = np.nanmean(comparison_data, axis=0)

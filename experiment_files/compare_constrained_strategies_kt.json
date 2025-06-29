@@ -200,7 +200,8 @@
                 ],
                 "cmin": -8.0,
                 "include_y_labels": true,
-                "include_colorbar": false
+                "include_colorbar": false,
+                "annotate": true
             },
             {
                 "scope": "search_strategy",
@@ -214,7 +215,8 @@
                 "cmin": -8.0,
                 "cnum": 10,
                 "include_y_labels": false,
-                "include_colorbar": true
+                "include_colorbar": true,
+                "annotate": true
             },
             {
                 "scope": "aggregate",
@@ -222,7 +224,8 @@
                 "comparison": {
                     "unit": "time",
                     "relative_time": 0.5
-                }
+                },
+                "annotate": true
             },
             {
                 "scope": "aggregate",

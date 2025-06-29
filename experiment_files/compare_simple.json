@@ -120,7 +120,8 @@
                 "comparison": {
                     "unit": "time",
                     "relative_time": 0.5
-                }
+                },
+                "annotate": true
             }
         ],
         "resolution": 1000.0,
