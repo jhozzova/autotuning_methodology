@@ -733,7 +733,7 @@ class Visualize:
                             number = plot_data[i, j]
                             if np.isnan(number):
                                 continue
-                            text = axs[0].text(j, i, f"{round(number, 2) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if (number > 0.5 or number < -2) else "black", fontsize="x-small")
+                            text = axs[0].text(j, i, f"{round(number, 2) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if (number > 0.5 or number < -2) else "black", fontsize="small")
 
                     # finalize the figure and save or display it
                     fig.tight_layout()
