@@ -1391,8 +1391,9 @@ class Visualize:
                     # given the performance at `compare_at_relative_time`, what is the index of the first time that strategy beta reaches at least the same performance?
                     index_matching = np.argwhere(curve_beta <= performance_at_comparison_alpha) if minimization else np.argwhere(curve_beta >= performance_at_comparison_alpha)
                     if index_matching.size == 0:
-                        # if strategy beta never reaches the performance of strategy alpha, we cannot compare, instead we penalize it by taking 10x the last time value
-                        time_at_comparison_beta = time_range_beta[-1] * 10
+                        # if strategy beta never reaches the performance of strategy alpha, we cannot compare, instead we take the time at the end so we know what the minimal performance gain is
+                        time_at_comparison_beta = time_range_beta[-1]
+                        # another alternative: take the last time * fraction of inverse (e.g. if GA-nc doesn’t find the objective of GA, take end-of-time * 1/([GA-to-GAnc]/100))
                         # inner_comparison_data[strategy_index_beta] = np.nan
                         # continue
                     else:
