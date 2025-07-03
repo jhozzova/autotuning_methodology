@@ -4,13 +4,13 @@ from __future__ import annotations  # for correct nested type hints e.g. list[st
 
 import warnings
 from collections import defaultdict
-from pathlib import Path
 from math import ceil
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.cm import get_cmap
-from matplotlib.colors import to_rgb, to_hex, rgb2hex, LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, rgb2hex, to_hex, to_rgb
 
 from autotuning_methodology.baseline import (
     Baseline,
@@ -474,9 +474,9 @@ class Visualize:
             for strategy in self.strategies:
                 strategy_name = strategy["name"]
                 strategy_displayname = strategy["display_name"]
-                assert sum([1 for s in self.strategies if s["name"] == strategy_name]) == 1, (
-                    f"Strategy name '{strategy_name}' is not unqiue"
-                )
+                assert (
+                    sum([1 for s in self.strategies if s["name"] == strategy_name]) == 1
+                ), f"Strategy name '{strategy_name}' is not unqiue"
 
                 # get the data from the collected aggregated data
                 for gpu_name in self.experiment["experimental_groups_defaults"]["gpus"]:
@@ -514,9 +514,9 @@ class Visualize:
                                 if combine
                                 else x_axis_range_real
                             )
-                            assert np.array_equal(time_range, x_axis_range, equal_nan=True), (
-                                "time_range != x_axis_range"
-                            )
+                            assert np.array_equal(
+                                time_range, x_axis_range, equal_nan=True
+                            ), "time_range != x_axis_range"
                             curve = np.concatenate([curve_real, curve_fictional]) if combine else curve_real
                             # get the standardised curves and write them to the collector
                             curve: np.ndarray = random_baseline.get_standardised_curves(
@@ -596,15 +596,17 @@ class Visualize:
                         )
 
                     # validate the data is within the vmin-vmax range and visible colorbar range
-                    assert not (plot_data > 1.0).any(), (
+                    assert not (
+                        plot_data > 1.0
+                    ).any(), (
                         "Plot data contains values greater than 1.0, which should not be possible. Please investigate."
                     )
                     if cap_to_vmin:
                         plot_data = np.clip(plot_data, vmin, 1.0)
                     outside_range = np.where(np.logical_or(plot_data < vmin, plot_data > vmax))
-                    assert len(outside_range[0]) == 0 and len(outside_range[1]) == 0, (
-                        f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
-                    )
+                    assert (
+                        len(outside_range[0]) == 0 and len(outside_range[1]) == 0
+                    ), f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
                     outside_visible_range = np.where(np.logical_or(plot_data < cmin, plot_data > cmax))
                     if not (len(outside_visible_range[0]) == 0 and len(outside_visible_range[1]) == 0):
                         warnings.warn(
@@ -748,9 +750,9 @@ class Visualize:
                     fig.tight_layout()
                     if save_figs:
                         suffix = ""
-                        if include_colorbar:
+                        if include_colorbar and not (x_type == "time" or y_type == "time"):
                             suffix += "_colorbar"
-                        if include_y_labels:
+                        if include_y_labels and not (x_type == "time" or y_type == "time"):
                             suffix += "_ylabels"
                         filename_path = (
                             Path(self.plot_filename_prefix)
@@ -1263,9 +1265,9 @@ class Visualize:
         strategy_labels = list()
 
         for print_skip_key in print_skip:
-            assert print_skip_key in objective_time_keys, (
-                f"Each key in print_skip must be in objective_time_keys, {print_skip_key} is not ({objective_time_keys})"
-            )
+            assert (
+                print_skip_key in objective_time_keys
+            ), f"Each key in print_skip must be in objective_time_keys, {print_skip_key} is not ({objective_time_keys})"
 
         # get a dictionary of {time_key: [array_average_time_per_strategy]}
         data_dict = dict.fromkeys(objective_time_keys)
@@ -1421,11 +1423,13 @@ class Visualize:
 
             absolute_optimum = searchspace_stats.total_performance_absolute_optimum()
             median = searchspace_stats.total_performance_median()
+
             def normalize(val):
                 """Min-max normalization of the performance value."""
                 if absolute_optimum == median:
                     return 0.0
                 return (val - median) / (absolute_optimum - median)
+
             performance_at_comparison_alpha_norm = normalize(performance_at_comparison_alpha)
 
             # compare against all other strategies
