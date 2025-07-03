@@ -964,6 +964,8 @@ class Visualize:
                 # cmin = np.nanmin(comparison_data_clipped)
                 cmin = vmin  # always show 0.0 as the start
                 max_val = np.nanmax(comparison_data_clipped)
+                if np.isnan(max_val):
+                    max_val = vmax
                 # round to the nearest 100
                 cmax = round(ceil(max_val), -2)
                 if cmax < max_val:
@@ -1009,7 +1011,7 @@ class Visualize:
                     ax.text(
                         i,
                         len(y_ticks) - 0.2,
-                        f"{round(avg, 1) if avg < 100 else round(avg)}%",
+                        f"{"NaN" if np.isnan(avg) else round(avg, 1) if avg < 100 else round(avg)}%",
                         ha="center",
                         va="center",
                         color="black",
