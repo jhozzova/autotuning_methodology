@@ -144,7 +144,7 @@ class ResultsDescription:
     def __check_for_file(self) -> bool:
         """Check whether the file exists."""
         full_filepath = self.__get_cache_full_filepath()
-        self.__stored = full_filepath.exists() and np.DataSource().exists(full_filepath)
+        self.__stored = full_filepath.exists() and np.lib.npyio.DataSource().exists(full_filepath)
         return self.__stored
 
     def __write_to_file(self, arrays: dict):

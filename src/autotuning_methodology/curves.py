@@ -45,11 +45,11 @@ def get_indices_in_distribution(
     # check whether each value of draws (excluding NaN) is in dist
     if not skip_draws_check:
         assert np.all(
-            np.in1d(draws[~np.isnan(draws)], dist)
+            np.isin(draws[~np.isnan(draws)], dist)
         ), f"""
             Each value in draws should be in dist,
-            but {np.size(draws[~np.isnan(draws)][~np.in1d(draws[~np.isnan(draws)], dist)])} values
-            of the {np.size(draws)} are missing: {draws[~np.isnan(draws)][~np.in1d(draws[~np.isnan(draws)], dist)]}"""
+            but {np.size(draws[~np.isnan(draws)][~np.isin(draws[~np.isnan(draws)], dist)])} values
+            of the {np.size(draws)} are missing: {draws[~np.isnan(draws)][~np.isin(draws[~np.isnan(draws)], dist)]}"""
 
     # check the sorter
     if sorter is not None:
@@ -60,8 +60,8 @@ def get_indices_in_distribution(
     assert indices_found.shape == draws.shape, "The shape of the indices must match the shape of the draws"
 
     # if indices found are outside the array, make them NaN
-    indices_found[indices_found < 0] = np.NaN
-    indices_found[indices_found >= len(dist)] = np.NaN
+    indices_found[indices_found < 0] = np.nan
+    indices_found[indices_found >= len(dist)] = np.nan
 
     return indices_found
 
@@ -87,7 +87,7 @@ def get_indices_in_array(values: np.ndarray, array: np.ndarray) -> np.ndarray:
 
     # replace the indices found with the original, unsorted indices of array
     nan_mask = ~np.isnan(indices_found)
-    indices_found_unsorted = np.full_like(indices_found, fill_value=np.NaN)
+    indices_found_unsorted = np.full_like(indices_found, fill_value=np.nan)
     indices_found_unsorted[nan_mask] = array_sorter[indices_found[nan_mask].astype(int)]
 
     return indices_found_unsorted
@@ -882,7 +882,7 @@ class StochasticOptimizationAlgorithm(Curve):
         objective_time_keys = searchspace_stats.objective_time_keys
         num_keys = len(objective_time_keys)
         num_repeats = matching_indices_mask.shape[1]
-        masked_time_per_key = np.full((num_keys, matching_indices_mask.shape[0], num_repeats), np.NaN)
+        masked_time_per_key = np.full((num_keys, matching_indices_mask.shape[0], num_repeats), np.nan)
 
         # for each key, apply the boolean mask
         for key_index in range(num_keys):
@@ -891,13 +891,13 @@ class StochasticOptimizationAlgorithm(Curve):
             ]
 
         # remove where every repeat has NaN
-        time_in_range_per_key = np.full((num_keys, fevals_range.shape[0], num_repeats), np.NaN)
+        time_in_range_per_key = np.full((num_keys, fevals_range.shape[0], num_repeats), np.nan)
         for key_index in range(num_keys):
             all_nan_mask = ~np.all(np.isnan(masked_time_per_key[key_index]), axis=1)
             time_in_range_per_key[key_index] = masked_time_per_key[key_index][all_nan_mask]
 
         # get the median time per key at each repeat
-        split_time_per_feval = np.full((num_keys, fevals_range.shape[0]), np.NaN)
+        split_time_per_feval = np.full((num_keys, fevals_range.shape[0]), np.nan)
         for key_index in range(num_keys):
             split_time_per_feval[key_index] = np.mean(time_in_range_per_key[key_index], axis=1)
         assert split_time_per_feval.shape == (
@@ -916,7 +916,7 @@ class StochasticOptimizationAlgorithm(Curve):
 
         # for each key, interpolate the split times to the time range
         num_keys = len(searchspace_stats.objective_time_keys)
-        split_time_per_timestamp = np.full((num_keys, time_range.shape[0]), np.NaN)
+        split_time_per_timestamp = np.full((num_keys, time_range.shape[0]), np.nan)
         for key_index in range(num_keys):
             # remove NaN
             times_split_key = times_split[key_index]
@@ -983,7 +983,7 @@ class StochasticOptimizationAlgorithm(Curve):
         num_repeats = values.shape[1]
 
         # predict an isotonic curve for the time range for each run
-        predictions = np.full((num_repeats, time_range.shape[0]), fill_value=np.NaN)
+        predictions = np.full((num_repeats, time_range.shape[0]), fill_value=np.nan)
         for run in range(num_repeats):
             # get the data of this run
             _x = times[:, run]

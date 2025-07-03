@@ -953,9 +953,9 @@ class Visualize:
                     cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                     cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                 if comparison_unit == "time":
-                    cbar.ax.set_ylabel(f"Time difference to same objective value (lower is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel("Time difference to same objective value (lower is better)", rotation=-90, va="bottom")
                 elif comparison_unit == "objective":
-                    cbar.ax.set_ylabel(f"Objective value difference at same time (higher is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel("Objective value difference at same time (higher is better)", rotation=-90, va="bottom")
                 else:
                     raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
@@ -1232,7 +1232,7 @@ class Visualize:
             for _ in range((len(strategies_curves) - len(self.plot_skip_strategies)) + 1)
         )
         for objective_time_key in objective_time_keys:
-            data_dict[objective_time_key] = np.full((len(strategies_curves)), np.NaN)
+            data_dict[objective_time_key] = np.full((len(strategies_curves)), np.nan)
         for strategy_index, strategy_curve in enumerate(strategies_curves):
             if strategy_curve.name in self.plot_skip_strategies:
                 continue
@@ -1700,7 +1700,7 @@ class Visualize:
             raise ValueError(f"Invalid {tmin=}, must be between 0.0 and 1.0 or 'real'")
 
         # adjust the xlabel if necessary
-        if tmin == "real" and not "xlabel" in plot_settings:
+        if tmin == "real" and "xlabel" not in plot_settings:
             xlabel = "Relative time until the last strategy stopped"
 
         # plot each strategy

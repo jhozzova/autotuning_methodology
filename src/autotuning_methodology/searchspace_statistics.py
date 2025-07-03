@@ -2,7 +2,6 @@
 
 from __future__ import annotations  # for correct nested type hints e.g. list[str], tuple[dict, str]
 
-import json
 from math import ceil, floor
 from pathlib import Path
 from warnings import warn
@@ -11,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from autotuning_methodology.formats_interface import load_T4_format
-from autotuning_methodology.validators import is_invalid_objective_performance, is_invalid_objective_time, validate_T4
+from autotuning_methodology.validators import is_invalid_objective_performance, is_invalid_objective_time
 
 
 def nansumwrapper(array: np.ndarray, **kwargs) -> np.ndarray:
