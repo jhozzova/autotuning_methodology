@@ -96,7 +96,7 @@ def test_CLI_input():
     with pytest.raises(SystemExit) as e:
         dummy_args = ["-dummy_arg=option"]
         get_args_from_cli(dummy_args)
-    assert isinstance(e.type, SystemExit)
+    assert e.type == SystemExit  # noqa: E721
     assert e.value.code == 2
 
     # improper input 2
