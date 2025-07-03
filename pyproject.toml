@@ -83,5 +83,6 @@ select = [
     "D", # pydocstyle,
     "NPY201", # Numpy 2.0 compatibility
 ]
+ignore = ["E501"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"

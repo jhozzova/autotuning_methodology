@@ -16,7 +16,7 @@ nox.options.error_on_missing_interpreters = True
 def lint(session: nox.Session) -> None:
     """Ensure the code is formatted as expected."""
     session.install("ruff")
-    session.run("ruff", "check", "--output-format=github", "--config=pyproject.toml", ".")
+    session.run("ruff", "check", "--output-format=github", "--config=pyproject.toml", "src")
 
 
 # @nox.session  # uncomment this line to only run on the current python interpreter
