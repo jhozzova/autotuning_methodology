@@ -46,6 +46,7 @@ def get_args_from_cli(args=None) -> str:
 
 
 def make_and_check_path(filename: str, parent=None, extension=None) -> Path:
+    """Checks if the file exists, if not, tries to add the extension."""
     filename_path = Path(filename)
     if filename_path.is_absolute() is False and parent is not None:
         filename_path = PACKAGE_ROOT / Path(parent).joinpath(filename).resolve()

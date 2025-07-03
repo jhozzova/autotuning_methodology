@@ -170,7 +170,7 @@ class SearchspaceStatistics:
             minimization: whether the optimization algorithm was minimizing.
             objective_time_keys: the objective time keys used.
             objective_performance_keys: the objective performance keys used.
-            full_search_space_path: the path to the full search space file.
+            full_search_space_file_path: the path to the full search space file.
         """
         self.loaded = False
         self.application_name = application_name

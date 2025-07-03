@@ -19,6 +19,7 @@ def get_aggregation_data_key(gpu_name: str, application_name: str):
 
     Args:
         gpu_name: the GPU name
+        application_name: the application name
 
     Returns:
         The key as a string.
@@ -43,6 +44,7 @@ def get_aggregation_data(
     Args:
         experiment_folderpath: _description_
         experiment: _description_
+        searchspace_statistics: _description_
         strategies: _description_
         results_descriptions: _description_
         cutoff_percentile: _description_

@@ -10,8 +10,7 @@ from math import ceil
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.cm import get_cmap
-from matplotlib.colors import to_rgb, to_hex, LinearSegmentedColormap
-# from matplotlib.colors import LinearSegmentedColormap, rgb2hex
+from matplotlib.colors import to_rgb, to_hex, rgb2hex, LinearSegmentedColormap
 
 from autotuning_methodology.baseline import (
     Baseline,
@@ -762,87 +761,87 @@ class Visualize:
                     else:
                         plt.show()
             elif style == "compare_heatmaps":
-                comparisons = plot["comparison"]
 
                 raise NotImplementedError("Still a work in progress")
 
-                # set up the plot
-                fig, axs = plt.subplots(
-                    ncols=1, figsize=(9, 6), dpi=300
-                )  # if multiple subplots, pass the axis to the plot function with axs[0] etc.
-                if not hasattr(axs, "__len__"):
-                    axs = [axs]
-                # title = f"Performance of {strategy_displayname} over {'+'.join(plot_x_value_types)},{'+'.join(plot_y_value_types)}"
-                # fig.canvas.manager.set_window_title(title)
-                # if not save_figs:
-                # fig.suptitle(title)
+                # comparisons = plot["comparison"]
+                # # set up the plot
+                # fig, axs = plt.subplots(
+                #     ncols=1, figsize=(9, 6), dpi=300
+                # )  # if multiple subplots, pass the axis to the plot function with axs[0] etc.
+                # if not hasattr(axs, "__len__"):
+                #     axs = [axs]
+                # # title = f"Performance of {strategy_displayname} over {'+'.join(plot_x_value_types)},{'+'.join(plot_y_value_types)}"
+                # # fig.canvas.manager.set_window_title(title)
+                # # if not save_figs:
+                # # fig.suptitle(title)
 
-                for comparison in comparisons:
-                    strategy_names = comparisons["strategies"]
-                    strategies = [s for s in self.strategies if s["name"]]
-                    # for strategy in strategies:
-                    strategy_displayname = strategy["display_name"]
-                    strategy_data = data_collected[strategy_name]
+                # for comparison in comparisons:
+                #     strategy_names = comparisons["strategies"]
+                #     strategies = [s for s in self.strategies if s["name"]]
+                #     # for strategy in strategies:
+                #     strategy_displayname = strategy["display_name"]
+                #     strategy_data = data_collected[strategy_name]
 
-                    # get the performance per selected type in an array
-                    plot_data = np.stack(np.array([t[2] for t in strategy_data]))
-                    cutoff_percentile: float = self.experiment["statistics_settings"].get("cutoff_percentile", 1)
-                    cutoff_percentile_start: float = self.experiment["statistics_settings"].get(
-                        "cutoff_percentile_start", 0.01
-                    )
-                    label_data = {
-                        "gpus": (
-                            list(dict.fromkeys([t[0].replace(remove_from_gpus_label, "") for t in strategy_data])),
-                            "GPUs",
-                        ),
-                        "applications": (
-                            list(
-                                dict.fromkeys([t[1].replace(remove_from_applications_label, "") for t in strategy_data])
-                            ),
-                            "Applications",
-                        ),
-                        "searchspaces": (
-                            list(
-                                dict.fromkeys(
-                                    [
-                                        f"{t[1]} on\n{t[0]}".replace(remove_from_searchspace_label, "")
-                                        for t in strategy_data
-                                    ]
-                                )
-                            ),
-                            "Searchspaces",
-                        ),
-                        "time": (
-                            np.round(np.linspace(0.0, 1.0, bins), 2),
-                            f"Fraction of time between {cutoff_percentile_start * 100}% and {cutoff_percentile * 100}%",
-                        ),
-                    }
-                    x_ticks = label_data[x_type][0]
-                    y_ticks = label_data[y_type][0]
-                    if (x_type == "time" and y_type == "searchspaces") or (
-                        x_type == "searchspaces" and y_type == "time"
-                    ):
-                        plot_data: np.ndarray = np.stack(np.array([t[3] for t in strategy_data]))
-                        if x_type == "searchspaces":
-                            plot_data = plot_data.transpose()
-                    elif (x_type == "gpus" and y_type == "applications") or (
-                        y_type == "gpus" and x_type == "applications"
-                    ):
-                        plot_data = np.reshape(
-                            plot_data, (len(label_data["gpus"][0]), len(label_data["applications"][0]))
-                        )
-                        if x_type == "gpus":
-                            plot_data = np.transpose(plot_data)
-                    else:
-                        raise NotImplementedError(
-                            f"Heatmap has not yet been implemented for {x_type}, {y_type}. Submit an issue to request it."
-                        )
+                #     # get the performance per selected type in an array
+                #     plot_data = np.stack(np.array([t[2] for t in strategy_data]))
+                #     cutoff_percentile: float = self.experiment["statistics_settings"].get("cutoff_percentile", 1)
+                #     cutoff_percentile_start: float = self.experiment["statistics_settings"].get(
+                #         "cutoff_percentile_start", 0.01
+                #     )
+                #     label_data = {
+                #         "gpus": (
+                #             list(dict.fromkeys([t[0].replace(remove_from_gpus_label, "") for t in strategy_data])),
+                #             "GPUs",
+                #         ),
+                #         "applications": (
+                #             list(
+                #                 dict.fromkeys([t[1].replace(remove_from_applications_label, "") for t in strategy_data])
+                #             ),
+                #             "Applications",
+                #         ),
+                #         "searchspaces": (
+                #             list(
+                #                 dict.fromkeys(
+                #                     [
+                #                         f"{t[1]} on\n{t[0]}".replace(remove_from_searchspace_label, "")
+                #                         for t in strategy_data
+                #                     ]
+                #                 )
+                #             ),
+                #             "Searchspaces",
+                #         ),
+                #         "time": (
+                #             np.round(np.linspace(0.0, 1.0, bins), 2),
+                #             f"Fraction of time between {cutoff_percentile_start * 100}% and {cutoff_percentile * 100}%",
+                #         ),
+                #     }
+                #     x_ticks = label_data[x_type][0]
+                #     y_ticks = label_data[y_type][0]
+                #     if (x_type == "time" and y_type == "searchspaces") or (
+                #         x_type == "searchspaces" and y_type == "time"
+                #     ):
+                #         plot_data: np.ndarray = np.stack(np.array([t[3] for t in strategy_data]))
+                #         if x_type == "searchspaces":
+                #             plot_data = plot_data.transpose()
+                #     elif (x_type == "gpus" and y_type == "applications") or (
+                #         y_type == "gpus" and x_type == "applications"
+                #     ):
+                #         plot_data = np.reshape(
+                #             plot_data, (len(label_data["gpus"][0]), len(label_data["applications"][0]))
+                #         )
+                #         if x_type == "gpus":
+                #             plot_data = np.transpose(plot_data)
+                #     else:
+                #         raise NotImplementedError(
+                #             f"Heatmap has not yet been implemented for {x_type}, {y_type}. Submit an issue to request it."
+                #         )
 
-                    # validate the data
-                    outside_range = np.where(np.logical_or(plot_data < vmin, plot_data > vmax))
-                    assert len(outside_range[0]) == 0 and len(outside_range[1]) == 0, (
-                        f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
-                    )
+                #     # validate the data
+                #     outside_range = np.where(np.logical_or(plot_data < vmin, plot_data > vmax))
+                #     assert len(outside_range[0]) == 0 and len(outside_range[1]) == 0, (
+                #         f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
+                #     )
             else:
                 raise NotImplementedError(f"Invalid {style=}")
 
@@ -1422,7 +1421,11 @@ class Visualize:
 
             absolute_optimum = searchspace_stats.total_performance_absolute_optimum()
             median = searchspace_stats.total_performance_median()
-            normalize = lambda val: (val - median) / (absolute_optimum - median)
+            def normalize(val):
+                """Min-max normalization of the performance value."""
+                if absolute_optimum == median:
+                    return 0.0
+                return (val - median) / (absolute_optimum - median)
             performance_at_comparison_alpha_norm = normalize(performance_at_comparison_alpha)
 
             # compare against all other strategies
