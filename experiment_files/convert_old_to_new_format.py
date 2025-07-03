@@ -1,3 +1,5 @@
+"""Module to convert the old experiments file format into the new format."""
+
 # script to convert the old experiments file format into the new format
 import json
 from pathlib import Path
