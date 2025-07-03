@@ -1011,7 +1011,7 @@ class Visualize:
                     ax.text(
                         i,
                         len(y_ticks) - 0.2,
-                        f"{"NaN" if np.isnan(avg) else round(avg, 1) if avg < 100 else round(avg)}%",
+                        f"{'NaN' if np.isnan(avg) else round(avg, 1) if avg < 100 else round(avg)}%",
                         ha="center",
                         va="center",
                         color="black",

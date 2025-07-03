@@ -35,6 +35,7 @@ plot_filepaths: list[Path] = [
     plot_path_heatmap,
     plot_path_heatmap_time,
     plot_path_aggregated,
+    plot_path_aggregated_head2head,
     plot_path_split_times_fevals,
     plot_path_split_times_time,
     plot_path_split_times_bar,
