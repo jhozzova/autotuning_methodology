@@ -71,7 +71,7 @@ def get_aggregation_data(
                 results_description = results_descriptions[gpu_name][application_name][strategy["name"]]
                 if results_description is None:
                     raise ValueError(
-                        f"""Strategy {strategy['display_name']} not in results_description,
+                        f"""Strategy {strategy["display_name"]} not in results_description,
                             make sure execute_experiment() has ran first"""
                     )
                 curve = StochasticOptimizationAlgorithm(results_description)
@@ -229,9 +229,9 @@ def get_strategy_scores(experiment_filepath: str, use_strategy_as_baseline=None)
         if "Not enough overlap in time range and time values" in str(e.args[0]):
             # delete the broken cachefile
             _, strategy_name, application_name, device_name = e.args
-            assert results_descriptions[device_name][application_name][
-                strategy_name
-            ].delete(), "Failed to delete cachefile"
+            assert results_descriptions[device_name][application_name][strategy_name].delete(), (
+                "Failed to delete cachefile"
+            )
 
             # re-execute the experiment and recollect the data to see if the issue is resolved
             experiment, strategies, searchspace_statistics, results_descriptions = execute_experiment(

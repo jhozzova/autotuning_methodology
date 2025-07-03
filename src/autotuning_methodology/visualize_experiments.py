@@ -44,6 +44,7 @@ def lighten_color(color, amount: float = 0.5):
     r, g, b = to_rgb(color)
     return to_hex([(1 - amount) * c + amount for c in (r, g, b)])
 
+
 def get_colors(strategies: list[dict]) -> list:
     """Assign colors using the tab10 colormap, with lighter shades for children."""
     tab10 = plt.get_cmap("tab10").colors
@@ -70,8 +71,7 @@ def get_colors(strategies: list[dict]) -> list:
                 raise ValueError(f"Color parent '{name}' has more than two children")
             base_color = tab10[color_index]
             parent_colors[name] = {
-                idx: lighten_color(base_color, amount=0.4 + 0.3 * j)
-                for j, idx in enumerate(children_indices)
+                idx: lighten_color(base_color, amount=0.4 + 0.3 * j) for j, idx in enumerate(children_indices)
             }
             colors[i] = to_hex(base_color)
             color_index += 1
@@ -475,9 +475,9 @@ class Visualize:
             for strategy in self.strategies:
                 strategy_name = strategy["name"]
                 strategy_displayname = strategy["display_name"]
-                assert (
-                    sum([1 for s in self.strategies if s["name"] == strategy_name]) == 1
-                ), f"Strategy name '{strategy_name}' is not unqiue"
+                assert sum([1 for s in self.strategies if s["name"] == strategy_name]) == 1, (
+                    f"Strategy name '{strategy_name}' is not unqiue"
+                )
 
                 # get the data from the collected aggregated data
                 for gpu_name in self.experiment["experimental_groups_defaults"]["gpus"]:
@@ -515,9 +515,9 @@ class Visualize:
                                 if combine
                                 else x_axis_range_real
                             )
-                            assert np.array_equal(
-                                time_range, x_axis_range, equal_nan=True
-                            ), "time_range != x_axis_range"
+                            assert np.array_equal(time_range, x_axis_range, equal_nan=True), (
+                                "time_range != x_axis_range"
+                            )
                             curve = np.concatenate([curve_real, curve_fictional]) if combine else curve_real
                             # get the standardised curves and write them to the collector
                             curve: np.ndarray = random_baseline.get_standardised_curves(
@@ -569,7 +569,7 @@ class Visualize:
                         ),
                         "time": (
                             np.round(np.linspace(0.0, 1.0, bins), 2),
-                            f"Fraction of time between {cutoff_percentile_start*100}% and {cutoff_percentile*100}%",
+                            f"Fraction of time between {cutoff_percentile_start * 100}% and {cutoff_percentile * 100}%",
                         ),
                     }
                     x_ticks = label_data[x_type][0]
@@ -597,13 +597,15 @@ class Visualize:
                         )
 
                     # validate the data is within the vmin-vmax range and visible colorbar range
-                    assert not (plot_data > 1.0).any(), "Plot data contains values greater than 1.0, which should not be possible. Please investigate."
+                    assert not (plot_data > 1.0).any(), (
+                        "Plot data contains values greater than 1.0, which should not be possible. Please investigate."
+                    )
                     if cap_to_vmin:
                         plot_data = np.clip(plot_data, vmin, 1.0)
                     outside_range = np.where(np.logical_or(plot_data < vmin, plot_data > vmax))
-                    assert (
-                        len(outside_range[0]) == 0 and len(outside_range[1]) == 0
-                    ), f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
+                    assert len(outside_range[0]) == 0 and len(outside_range[1]) == 0, (
+                        f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
+                    )
                     outside_visible_range = np.where(np.logical_or(plot_data < cmin, plot_data > cmax))
                     if not (len(outside_visible_range[0]) == 0 and len(outside_visible_range[1]) == 0):
                         warnings.warn(
@@ -733,7 +735,15 @@ class Visualize:
                             number = plot_data[i, j]
                             if np.isnan(number):
                                 continue
-                            text = axs[0].text(j, i, f"{round(number, 2) if number < -10 else round(number, 3)}", ha="center", va="center", color="white" if (number > 0.5 or number < -2) else "black", fontsize="small")
+                            text = axs[0].text(
+                                j,
+                                i,
+                                f"{round(number, 2) if number < -10 else round(number, 3)}",
+                                ha="center",
+                                va="center",
+                                color="white" if (number > 0.5 or number < -2) else "black",
+                                fontsize="small",
+                            )
 
                     # finalize the figure and save or display it
                     fig.tight_layout()
@@ -804,7 +814,7 @@ class Visualize:
                         ),
                         "time": (
                             np.round(np.linspace(0.0, 1.0, bins), 2),
-                            f"Fraction of time between {cutoff_percentile_start*100}% and {cutoff_percentile*100}%",
+                            f"Fraction of time between {cutoff_percentile_start * 100}% and {cutoff_percentile * 100}%",
                         ),
                     }
                     x_ticks = label_data[x_type][0]
@@ -830,9 +840,9 @@ class Visualize:
 
                     # validate the data
                     outside_range = np.where(np.logical_or(plot_data < vmin, plot_data > vmax))
-                    assert (
-                        len(outside_range[0]) == 0 and len(outside_range[1]) == 0
-                    ), f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
+                    assert len(outside_range[0]) == 0 and len(outside_range[1]) == 0, (
+                        f"There are values outside of the range ({vmin}, {vmax}): {plot_data[outside_range]} ({outside_range} for strategy {strategy_displayname})"
+                    )
             else:
                 raise NotImplementedError(f"Invalid {style=}")
 
@@ -852,7 +862,9 @@ class Visualize:
                 annotate = plot.get("annotate", True)
 
                 # the comparison data will be a double nested dictionary of the strategy indices
-                comparison_data_raw = self.get_head2head_comparison_data(aggregation_data, compare_at_relative_time, comparison_unit)
+                comparison_data_raw = self.get_head2head_comparison_data(
+                    aggregation_data, compare_at_relative_time, comparison_unit
+                )
 
                 # if more than half of the comparisons between two strategies are NaN, set all to NaN
                 for strategy1 in comparison_data_raw.keys():
@@ -863,8 +875,13 @@ class Visualize:
 
                 # convert the comparison data dictionary to a 2D numpy array of means
                 comparison_data = np.array(
-                    [[np.nanmean(comparison_data_raw[strategy1][strategy2]) for strategy2 in comparison_data_raw[strategy1].keys()]
-                        for strategy1 in comparison_data_raw.keys()]
+                    [
+                        [
+                            np.nanmean(comparison_data_raw[strategy1][strategy2])
+                            for strategy2 in comparison_data_raw[strategy1].keys()
+                        ]
+                        for strategy1 in comparison_data_raw.keys()
+                    ]
                 ).transpose()
 
                 # set up the plot
@@ -883,7 +900,7 @@ class Visualize:
                 # elif comparison_unit == "objective":
                 #     ax.set_xlabel("How much objective value do these strategies achieve...")
                 # ax.set_ylabel("...relative to these strategies?")
-                # ax.xaxis.set_label_position('top') 
+                # ax.xaxis.set_label_position('top')
 
                 # set the x and y ticks
                 x_ticks = list(comparison_data_raw.keys())
@@ -896,6 +913,7 @@ class Visualize:
                 # set the color map
                 vmin = 0.0
                 vmax = 1000.0
+
                 def norm_color_val(v):
                     """Normalize a color value to fit in the 0-1 range."""
                     return (v - vmin) / (vmax - vmin)
@@ -926,7 +944,9 @@ class Visualize:
 
                 # if there are any values above the vmax, warn
                 if np.any(comparison_data > vmax):
-                    warnings.warn(f"There are values above the vmax ({vmax}) in the comparison data: {comparison_data[comparison_data > vmax]}, these are clipped")
+                    warnings.warn(
+                        f"There are values above the vmax ({vmax}) in the comparison data: {comparison_data[comparison_data > vmax]}, these are clipped"
+                    )
                 # clip the comparison data to the vmin-vmax range
                 comparison_data_clipped = np.clip(comparison_data, vmin, vmax)
 
@@ -941,7 +961,7 @@ class Visualize:
 
                 # set the colorbar
                 # cmin = np.nanmin(comparison_data_clipped)
-                cmin = vmin     # always show 0.0 as the start
+                cmin = vmin  # always show 0.0 as the start
                 max_val = np.nanmax(comparison_data_clipped)
                 # round to the nearest 100
                 cmax = round(ceil(max_val), -2)
@@ -953,9 +973,13 @@ class Visualize:
                     cbar.set_ticks(np.linspace(cmin, cmax, num=cnum))  # set colorbar limits
                     cbar.ax.set_ylim(cmin, cmax)  # adjust visible colorbar limits
                 if comparison_unit == "time":
-                    cbar.ax.set_ylabel("Time difference to same objective value (lower is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(
+                        "Time difference to same objective value (lower is better)", rotation=-90, va="bottom"
+                    )
                 elif comparison_unit == "objective":
-                    cbar.ax.set_ylabel("Objective value difference at same time (higher is better)", rotation=-90, va="bottom")
+                    cbar.ax.set_ylabel(
+                        "Objective value difference at same time (higher is better)", rotation=-90, va="bottom"
+                    )
                 else:
                     raise NotImplementedError(f"Comparison unit '{comparison_unit}' not implemented")
 
@@ -966,17 +990,33 @@ class Visualize:
                             number = comparison_data[i, j]
                             if np.isnan(number):
                                 continue
-                            text = ax.text(j, i, f"{round(number, 1) if number < 100 else round(number)}%", ha="center", va="center", color="white" if (number > 200 or number < 50) else "black", fontsize="small")
+                            text = ax.text(
+                                j,
+                                i,
+                                f"{round(number, 1) if number < 100 else round(number)}%",
+                                ha="center",
+                                va="center",
+                                color="white" if (number > 200 or number < 50) else "black",
+                                fontsize="small",
+                            )
 
                 # plot the averages per strategy as labels under the heatmap
                 averages = np.nanmean(comparison_data, axis=0)
                 # add "mean" before the averages
-                ax.text(-0.5, len(y_ticks)-0.2, "Mean:", ha="right", va="center", color="black", fontsize=10)
+                ax.text(-0.5, len(y_ticks) - 0.2, "Mean:", ha="right", va="center", color="black", fontsize=10)
                 for i, avg in enumerate(averages):
                     ax.text(
-                        i, len(y_ticks)-0.2, f"{round(avg, 1) if avg < 100 else round(avg)}%", ha="center", va="center", color="black", fontsize="small"
+                        i,
+                        len(y_ticks) - 0.2,
+                        f"{round(avg, 1) if avg < 100 else round(avg)}%",
+                        ha="center",
+                        va="center",
+                        color="black",
+                        fontsize="small",
                     )
-                print(f"Averages per strategy at {compare_at_relative_time} relative time: {[(s, a) for s, a in zip(x_ticks, averages)]}")
+                print(
+                    f"Averages per strategy at {compare_at_relative_time} relative time: {[(s, a) for s, a in zip(x_ticks, averages)]}"
+                )
 
                 # finalize the figure and save or display it
                 fig.tight_layout()
@@ -995,20 +1035,23 @@ class Visualize:
                 if not hasattr(axs, "__len__"):
                     axs = [axs]
                 title = f"""Aggregated Data\napplications:
-                        {', '.join(self.experiment['experimental_groups_defaults']['applications_names'])}\nGPUs: {', '.join(self.experiment['experimental_groups_defaults']['gpus'])}"""
+                        {", ".join(self.experiment["experimental_groups_defaults"]["applications_names"])}\nGPUs: {", ".join(self.experiment["experimental_groups_defaults"]["gpus"])}"""
                 fig.canvas.manager.set_window_title(title)
                 if not save_figs:
                     fig.suptitle(title)
 
                 # finalize the figure and save or display it
                 lowest_real_y_value = self.plot_strategies_aggregated(
-                    axs[0], aggregation_data, visualization_settings=self.experiment["visualization_settings"], plot_settings=plot
+                    axs[0],
+                    aggregation_data,
+                    visualization_settings=self.experiment["visualization_settings"],
+                    plot_settings=plot,
                 )
                 if vmin is not None:
                     if isinstance(vmin, (int, float)):
                         axs[0].set_ylim(bottom=vmin)
                     elif vmin == "real":
-                        axs[0].set_ylim(bottom=lowest_real_y_value - (abs(lowest_real_y_value)+1.0) * 0.02)
+                        axs[0].set_ylim(bottom=lowest_real_y_value - (abs(lowest_real_y_value) + 1.0) * 0.02)
                     else:
                         raise NotImplementedError(f"{vmin=} not implemented")
                 fig.tight_layout()
@@ -1221,9 +1264,9 @@ class Visualize:
         strategy_labels = list()
 
         for print_skip_key in print_skip:
-            assert (
-                print_skip_key in objective_time_keys
-            ), f"Each key in print_skip must be in objective_time_keys, {print_skip_key} is not ({objective_time_keys})"
+            assert print_skip_key in objective_time_keys, (
+                f"Each key in print_skip must be in objective_time_keys, {print_skip_key} is not ({objective_time_keys})"
+            )
 
         # get a dictionary of {time_key: [array_average_time_per_strategy]}
         data_dict = dict.fromkeys(objective_time_keys)
@@ -1298,14 +1341,16 @@ class Visualize:
         else:
             plt.show()
 
-    def get_head2head_comparison_data(self, aggregation_data: dict, compare_at_relative_time: float, comparison_unit: str) -> dict:
+    def get_head2head_comparison_data(
+        self, aggregation_data: dict, compare_at_relative_time: float, comparison_unit: str
+    ) -> dict:
         """Gets the data for a head-to-head comparison of strategies across all searchspaces."""
         # the comparison data will be a double nested dictionary of the strategy indices
         comparison_data = dict()
         for strategy_alpha in self.strategies:
-            comparison_data[strategy_alpha['display_name']] = dict()
+            comparison_data[strategy_alpha["display_name"]] = dict()
             for strategy_beta in self.strategies:
-                comparison_data[strategy_alpha['display_name']][strategy_beta['display_name']] = list()
+                comparison_data[strategy_alpha["display_name"]][strategy_beta["display_name"]] = list()
 
         # iterate over the searchspaces and strategies to get head2head data
         for gpu_name in self.experiment["experimental_groups_defaults"]["gpus"]:
@@ -1330,7 +1375,7 @@ class Visualize:
                 # for this searchspace, append each strategy's data to the comparison data
                 for strategy_index_alpha, strategy_alpha in enumerate(self.strategies):
                     for strategy_index_beta, strategy_beta in enumerate(self.strategies):
-                        comparison_data[strategy_alpha['display_name']][strategy_beta['display_name']].append(
+                        comparison_data[strategy_alpha["display_name"]][strategy_beta["display_name"]].append(
                             comparison_data_ss[strategy_index_alpha][strategy_index_beta]
                         )
 
@@ -1360,13 +1405,15 @@ class Visualize:
         """
         comparison_point = x_axis_range[-1] * compare_at_relative_time
         comparison_data = dict()
-        confidence_level = 0.95 # irrelevant because the confidence intervals are not used
+        confidence_level = 0.95  # irrelevant because the confidence intervals are not used
         minimization = searchspace_stats.minimization
-        dist = searchspace_stats.objective_performances_total_sorted                  
+        dist = searchspace_stats.objective_performances_total_sorted
         for strategy_index_alpha, strategy_alpha in enumerate(self.strategies):
             inner_comparison_data = dict()
             strategy_curve_alpha = strategies_curves[strategy_index_alpha]
-            _, time_range_alpha, curve_alpha, _, _ = strategy_curve_alpha.get_curve(x_axis_range, x_type, dist=dist, confidence_level=confidence_level, return_split=False)
+            _, time_range_alpha, curve_alpha, _, _ = strategy_curve_alpha.get_curve(
+                x_axis_range, x_type, dist=dist, confidence_level=confidence_level, return_split=False
+            )
 
             # find the index of the closest time and performance to the comparison point
             closest_index_alpha = np.argmin(np.abs(time_range_alpha - comparison_point))
@@ -1384,12 +1431,18 @@ class Visualize:
                     inner_comparison_data[strategy_index_beta] = np.nan
                     continue
                 strategy_curve_beta = strategies_curves[strategy_index_beta]
-                _, time_range_beta, curve_beta, _, _ = strategy_curve_beta.get_curve(x_axis_range, x_type, dist=dist, confidence_level=confidence_level, return_split=False)
+                _, time_range_beta, curve_beta, _, _ = strategy_curve_beta.get_curve(
+                    x_axis_range, x_type, dist=dist, confidence_level=confidence_level, return_split=False
+                )
 
                 # calculate the relative difference between the two strategies at the comparison point
                 if comparison_unit == "time":
                     # given the performance at `compare_at_relative_time`, what is the index of the first time that strategy beta reaches at least the same performance?
-                    index_matching = np.argwhere(curve_beta <= performance_at_comparison_alpha) if minimization else np.argwhere(curve_beta >= performance_at_comparison_alpha)
+                    index_matching = (
+                        np.argwhere(curve_beta <= performance_at_comparison_alpha)
+                        if minimization
+                        else np.argwhere(curve_beta >= performance_at_comparison_alpha)
+                    )
                     if index_matching.size == 0:
                         # if strategy beta never reaches the performance of strategy alpha, we cannot compare, instead we take the time at the end so we know what the minimal performance gain is
                         time_at_comparison_beta = time_range_beta[-1]
@@ -1400,12 +1453,14 @@ class Visualize:
                         # get the time at which strategy beta reaches the performance of strategy alpha
                         closest_index_beta = index_matching[0][0]  # take the first match
                         time_at_comparison_beta = time_range_beta[closest_index_beta]
-                    
+
                         # given the performance at `compare_at_relative_time`, how much longer does strategy beta take to get to the same performance compared to strategy alpha? (lower is better)
                         # closest_index_beta = np.argmin(np.abs(curve_beta - performance_at_comparison_alpha))
                         # time_at_comparison_beta = time_range_beta[closest_index_beta]
                     # outer takes X% of the time inner takes to reach the same performance (100%+percentage change)
-                    percentage_change = (time_at_comparison_alpha - time_at_comparison_beta) / abs(time_at_comparison_beta) * 100
+                    percentage_change = (
+                        (time_at_comparison_alpha - time_at_comparison_beta) / abs(time_at_comparison_beta) * 100
+                    )
                     inner_comparison_data[strategy_index_beta] = 100 + percentage_change
                 elif comparison_unit == "objective":
                     # given the time at `compare_at_relative_time`, how much worse is the objective value of strategy beta at that moment compared to strategy alpha? (higher is better)
@@ -1417,11 +1472,15 @@ class Visualize:
                     # if not minimization:
                     #     percentage_change = -percentage_change
 
-                    percentage_change_norm = (performance_at_comparison_beta_norm - performance_at_comparison_alpha_norm) / abs(performance_at_comparison_beta_norm) * 100
+                    percentage_change_norm = (
+                        (performance_at_comparison_beta_norm - performance_at_comparison_alpha_norm)
+                        / abs(performance_at_comparison_beta_norm)
+                        * 100
+                    )
                     inner_comparison_data[strategy_index_beta] = 100 + percentage_change_norm
                 else:
                     raise ValueError(f"Invalid comparison unit: {comparison_unit}. Expected 'time' or 'objective'.")
-            
+
             comparison_data[strategy_index_alpha] = inner_comparison_data
         return comparison_data
 
@@ -1671,7 +1730,10 @@ class Visualize:
         # get the relevant plot settings
         cutoff_percentile: float = self.experiment["statistics_settings"].get("cutoff_percentile", 1)
         cutoff_percentile_start: float = self.experiment["statistics_settings"].get("cutoff_percentile_start", 0.01)
-        xlabel = plot_settings.get("xlabel", f"{self.x_metric_displayname['aggregate_time']} ({cutoff_percentile_start*100}% to {cutoff_percentile*100}%)") # noqa: E501
+        xlabel = plot_settings.get(
+            "xlabel",
+            f"{self.x_metric_displayname['aggregate_time']} ({cutoff_percentile_start * 100}% to {cutoff_percentile * 100}%)",
+        )  # noqa: E501
         ylabel = plot_settings.get("ylabel", self.y_metric_displayname["aggregate_objective"])
         tmin = plot_settings.get("tmin", 1.0)
 
@@ -1684,7 +1746,13 @@ class Visualize:
         print("Quantification of aggregate performance across all search spaces:")
 
         # get the highest real_stopping_point_index, adjust y_axis_size and time_range if necessary
-        real_stopping_point_indices = [min(round(strategies_real_stopping_point_fraction[strategy_index] * time_range.shape[0]) + 1, time_range.shape[0]) for strategy_index in range(len(strategies_performance))]  # noqa: E501
+        real_stopping_point_indices = [
+            min(
+                round(strategies_real_stopping_point_fraction[strategy_index] * time_range.shape[0]) + 1,
+                time_range.shape[0],
+            )
+            for strategy_index in range(len(strategies_performance))
+        ]  # noqa: E501
         real_stopping_point_index_max = max(real_stopping_point_indices)
         if tmin == "real":
             # stop the time at the largest real stopping point
@@ -1742,9 +1810,9 @@ class Visualize:
                     and real_stopping_point_index < len(strategy_lower_err) - 1
                 ):
                     ax.fill_between(
-                        time_range[real_stopping_point_index-1:y_axis_size],
-                        strategy_lower_err[real_stopping_point_index-1:y_axis_size],
-                        strategy_upper_err[real_stopping_point_index-1:y_axis_size],
+                        time_range[real_stopping_point_index - 1 : y_axis_size],
+                        strategy_lower_err[real_stopping_point_index - 1 : y_axis_size],
+                        strategy_upper_err[real_stopping_point_index - 1 : y_axis_size],
                         alpha=0.15,
                         antialiased=True,
                         color=color,
@@ -1763,8 +1831,8 @@ class Visualize:
                 and real_stopping_point_index < len(strategy_performance) - 1
             ):
                 ax.plot(
-                    time_range[real_stopping_point_index-1:y_axis_size],
-                    strategy_performance[real_stopping_point_index-1:y_axis_size],
+                    time_range[real_stopping_point_index - 1 : y_axis_size],
+                    strategy_performance[real_stopping_point_index - 1 : y_axis_size],
                     color=color,
                     ls="dashed",
                 )
@@ -1788,7 +1856,7 @@ class Visualize:
 
         # set the limits and legend
         ax.set_ylim(top=1.02)
-        ax.set_xlim((0, y_axis_size-1))
+        ax.set_xlim((0, y_axis_size - 1))
         ax.legend()
         return lowest_real_y_value
 

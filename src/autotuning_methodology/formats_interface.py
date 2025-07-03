@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from autotuning_methodology.validators import validate_T4
 
+
 def load_T4_format(filepath: Path, validate: True) -> dict:
     """Load and optionally validate a T4 format file."""
     with open(filepath, "r", encoding="utf-8") as fh:

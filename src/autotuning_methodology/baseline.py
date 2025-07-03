@@ -184,7 +184,9 @@ class RandomSearchCalculatedBaseline(Baseline):
             return self._get_random_curve_means(fevals_range)
         return self._get_random_curve(fevals_range)
 
-    def get_curve_over_time(self, time_range: np.ndarray, dist=None, confidence_level=None, return_split=False) -> np.ndarray:  # noqa: D102
+    def get_curve_over_time(
+        self, time_range: np.ndarray, dist=None, confidence_level=None, return_split=False
+    ) -> np.ndarray:  # noqa: D102
         fevals_range = self.time_to_fevals(time_range)
         curve_over_time = self.get_curve_over_fevals(fevals_range, dist, confidence_level)
         smoothing_factor = 0.0
@@ -337,7 +339,9 @@ class RandomSearchSimulatedBaseline(Baseline):
             assert self.y_array.ndim == 1
             return self.y_array[fevals_range]
 
-    def get_curve_over_time(self, time_range: np.ndarray, dist=None, confidence_level=None, return_split=False) -> np.ndarray:  # noqa: D102
+    def get_curve_over_time(
+        self, time_range: np.ndarray, dist=None, confidence_level=None, return_split=False
+    ) -> np.ndarray:  # noqa: D102
         predicted_y_values = self._ir.predict(time_range)
         if not self.use_index:
             return predicted_y_values
@@ -427,7 +431,9 @@ class ExecutedStrategyBaseline(Baseline):
         )
         return self.stochastic_curve_to_deterministic(range=fevals_range, curve=stochastic_curve)
 
-    def get_curve_over_time(self, time_range: np.ndarray, dist=None, confidence_level=None, return_split=False) -> np.ndarray:  # noqa: D102
+    def get_curve_over_time(
+        self, time_range: np.ndarray, dist=None, confidence_level=None, return_split=False
+    ) -> np.ndarray:  # noqa: D102
         if dist is None:
             dist = self.searchspace_stats.objective_performances_total_sorted
         if confidence_level is None:

@@ -163,7 +163,9 @@ def tune(
                     f"Much fewer configurations were returned ({num_results}) than the requested {max_fevals}"
                 )
             if num_results < 2 and group["budget"]["max_fevals"] > 2:
-                raise ValueError(f"Less than two configurations were returned ({len(results['results'])}, budget {group['budget']}) \n")
+                raise ValueError(
+                    f"Less than two configurations were returned ({len(results['results'])}, budget {group['budget']}) \n"
+                )
         return metadata, results
 
     def tune_with_BAT():
@@ -261,13 +263,13 @@ def collect_results(
     def report_multiple_attempts(rep: int, len_res: int, group_repeats: int, attempt: int):
         """If multiple attempts are necessary, report the reason."""
         if len_res < 1:
-            print(f"({rep+1}/{group_repeats}) No results found, trying once more...")
+            print(f"({rep + 1}/{group_repeats}) No results found, trying once more...")
         elif len_res < min_num_evals:
             print(
                 f"Too few results found ({len_res} of {min_num_evals} required, attempt {attempt}), trying once more..."
             )
         else:
-            print(f"({rep+1}/{group_repeats}) Only invalid results found, trying once more...")
+            print(f"({rep + 1}/{group_repeats}) Only invalid results found, trying once more...")
 
     def cumulative_time_taken(results: list) -> list:
         """Calculates the cumulative time taken for each of the configurations in results."""
@@ -310,7 +312,9 @@ def collect_results(
             if attempt > 0:
                 report_multiple_attempts(rep, len_res, group["repeats"], attempt)
             if attempt >= 20:
-                raise RuntimeError(f"Could not find enough results for {results_description.application_name} on {results_description.device_name} in {attempt} attempts ({'only invalid, ' if only_invalid else ''}{len_res}/{min_num_evals}), quiting...")
+                raise RuntimeError(
+                    f"Could not find enough results for {results_description.application_name} on {results_description.device_name} in {attempt} attempts ({'only invalid, ' if only_invalid else ''}{len_res}/{min_num_evals}), quiting..."
+                )
             _, results, total_time_ms = tune(
                 input_file,
                 results_description.application_name,
@@ -406,9 +410,9 @@ def write_results(repeated_results: list, results_description: ResultsDescriptio
             objective_times_list = []
             for key_index, key in enumerate(objective_time_keys):
                 evaluation_times = evaluation["times"]
-                assert (
-                    key in evaluation_times
-                ), f"Objective time key {key} not in evaluation['times'] ({evaluation_times})"
+                assert key in evaluation_times, (
+                    f"Objective time key {key} not in evaluation['times'] ({evaluation_times})"
+                )
                 if isinstance(evaluation_times[key], list):
                     # this happens when runtimes are in objective_time_keys
                     value = sum(evaluation_times[key])
@@ -430,9 +434,9 @@ def write_results(repeated_results: list, results_description: ResultsDescriptio
             for key_index, key in enumerate(objective_performance_keys):
                 evaluation_measurements = evaluation["measurements"]
                 measurements = list(filter(lambda m: m["name"] == key, evaluation_measurements))
-                assert (
-                    len(measurements) > 0
-                ), f"Objective performance key name {key} not in evaluation['measurements'] ({evaluation_measurements})"
+                assert len(measurements) > 0, (
+                    f"Objective performance key name {key} not in evaluation['measurements'] ({evaluation_measurements})"
+                )
                 assert len(measurements) == 1, f"""Objective performance key name {key} multiply defined
                         in evaluation['measurements'] ({evaluation_measurements})"""
                 value = measurements[0]["value"]

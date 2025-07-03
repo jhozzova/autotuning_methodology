@@ -210,13 +210,15 @@ def generate_all_experimental_groups(
                         gpu,
                         application["name"],
                     )
-                
+
                 # get the objective performance keys
                 if "objective_performance_keys" in application:
                     group["objective_performance_keys"] = application["objective_performance_keys"]
                 else:
                     # load the full search space file and derive the objective performance keys
-                    print(f"Loading full search space file {group['full_search_space_file']} to infer the objective performance keys. Consider setting them explicititely in the experiments file.")
+                    print(
+                        f"Loading full search space file {group['full_search_space_file']} to infer the objective performance keys. Consider setting them explicititely in the experiments file."
+                    )
                     data = load_T4_format(group["full_search_space_file"], validate=True)
                     objectives = data["results"][0]["objectives"]
                     assert len(objectives) == 1, "Only one objective is supported for now"
@@ -327,7 +329,9 @@ def calculate_budget(group: dict, statistics_settings: dict, searchspace_stats: 
     # register in the group
     group["budget"] = {}
     group["cutoff_times"] = {
-        "cutoff_time_start": max(cutoff_point_start_time, 0.0) if statistics_settings["cutoff_percentile_start"] > 0.0 else 0.0,
+        "cutoff_time_start": max(cutoff_point_start_time, 0.0)
+        if statistics_settings["cutoff_percentile_start"] > 0.0
+        else 0.0,
         "cutoff_time": cutoff_point_time * (1 + cutoff_margin),
     }
 

@@ -264,7 +264,11 @@ class SearchspaceStatistics:
         Returns:
             A tuple of the objective value at the cutoff point and the fevals to the cutoff point.
         """
-        inverted_sorted_performance_arr = self.objective_performances_total_sorted[::-1] if self.minimization else self.objective_performances_total_sorted
+        inverted_sorted_performance_arr = (
+            self.objective_performances_total_sorted[::-1]
+            if self.minimization
+            else self.objective_performances_total_sorted
+        )
         N = inverted_sorted_performance_arr.shape[0]
 
         # get the objective performance at the cutoff point
@@ -295,11 +299,15 @@ class SearchspaceStatistics:
         # i = next(x[0] for x in enumerate(inverted_sorted_performance_arr) if x[1] > cutoff_percentile * arr[-1])
         if self.minimization:
             i = next(
-                x[0] for x in enumerate(inverted_sorted_performance_arr) if x[1] <= objective_performance_at_cutoff_point
+                x[0]
+                for x in enumerate(inverted_sorted_performance_arr)
+                if x[1] <= objective_performance_at_cutoff_point
             )
         else:
             i = next(
-                x[0] for x in enumerate(inverted_sorted_performance_arr) if x[1] >= objective_performance_at_cutoff_point
+                x[0]
+                for x in enumerate(inverted_sorted_performance_arr)
+                if x[1] >= objective_performance_at_cutoff_point
             )
         if cutoff_percentile != 1.0 and inverted_sorted_performance_arr[i] == self.total_performance_absolute_optimum():
             if i == 0:
@@ -371,7 +379,9 @@ class SearchspaceStatistics:
             raise ValueError("Cutoff point start and end are the same")
 
         # get the times
-        cutoff_point_time_start = self.cutoff_point_time_from_fevals(cutoff_point_fevals_start if cutoff_percentile_start > 0.0 else 0)
+        cutoff_point_time_start = self.cutoff_point_time_from_fevals(
+            cutoff_point_fevals_start if cutoff_percentile_start > 0.0 else 0
+        )
         cutoff_point_time_end = self.cutoff_point_time_from_fevals(cutoff_point_fevals_end)
 
         # return the values
@@ -413,12 +423,12 @@ class SearchspaceStatistics:
         self.objective_times = dict()
         for key in self.objective_time_keys:
             self.objective_times[key] = to_valid_array(results, key, performance=False, from_time_unit=timeunit)
-            assert (
-                self.objective_times[key].ndim == 1
-            ), f"Should have one dimension, has {self.objective_times[key].ndim}"
-            assert (
-                self.objective_times[key].shape[0] == self.size
-            ), f"Should have the same size as results ({self.size}), has {self.objective_times[key].shape[0]}"
+            assert self.objective_times[key].ndim == 1, (
+                f"Should have one dimension, has {self.objective_times[key].ndim}"
+            )
+            assert self.objective_times[key].shape[0] == self.size, (
+                f"Should have the same size as results ({self.size}), has {self.objective_times[key].shape[0]}"
+            )
             assert not np.all(np.isnan(self.objective_times[key])), f"""All values for {key=} are NaN.
                     Likely the experiment did not collect time values for objective_time_keys '{key}'."""
 
@@ -431,9 +441,9 @@ class SearchspaceStatistics:
                 performance=True,
                 replace_missing_measurement_from_times_key="runtimes" if key == "time" else None,
             )
-            assert (
-                self.objective_performances[key].ndim == 1
-            ), f"Should have one dimension, has {self.objective_performances[key].ndim}"
+            assert self.objective_performances[key].ndim == 1, (
+                f"Should have one dimension, has {self.objective_performances[key].ndim}"
+            )
             assert (
                 self.objective_performances[key].shape[0] == self.size
             ), f"""Should have the same size as results ({self.size}),
@@ -473,9 +483,7 @@ class SearchspaceStatistics:
             {np.nansum(self.objective_performances_array[:, 0])} vs. {self.objective_performances_total[0]}"""
 
         # sort
-        self.objective_times_total_sorted = np.sort(
-            self.objective_times_total[~np.isnan(self.objective_times_total)]
-        )
+        self.objective_times_total_sorted = np.sort(self.objective_times_total[~np.isnan(self.objective_times_total)])
         self.objective_times_number_of_nan = (
             self.objective_times_total.shape[0] - self.objective_times_total_sorted.shape[0]
         )

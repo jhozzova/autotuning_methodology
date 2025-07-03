@@ -121,12 +121,16 @@ class ResultsDescription:
 
         # check if same value for each key
         for attribute_key, attribute_value in self.__get_as_dict().items():
-            if attribute_key == "group_display_name" or attribute_key == "visualization_caches_path" or attribute_key == "run_folder":
+            if (
+                attribute_key == "group_display_name"
+                or attribute_key == "visualization_caches_path"
+                or attribute_key == "run_folder"
+            ):
                 continue
             else:
-                assert (
-                    attribute_value == other.__get_as_dict()[attribute_key]
-                ), f"{attribute_key} has different values: {attribute_value} != {other.__get_as_dict()[attribute_key]}"
+                assert attribute_value == other.__get_as_dict()[attribute_key], (
+                    f"{attribute_key} has different values: {attribute_value} != {other.__get_as_dict()[attribute_key]}"
+                )
 
         return True
 
