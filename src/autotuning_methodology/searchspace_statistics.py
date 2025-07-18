@@ -59,10 +59,18 @@ def is_not_invalid_value(value, performance: bool) -> bool:
     invalid_check_function = is_invalid_objective_performance if performance else is_invalid_objective_time
     return not invalid_check_function(value)
 
-def filter_invalids(values: np.ndarray, performance: bool) -> np.ndarray:
-    """Filter out invalid values from the array."""
-    return np.array([v for v in values if is_not_invalid_value(v, performance)])
-
+def filter_invalids(values, performance: bool) -> list:
+    """Filter out invalid values from the array. 
+    
+    Assumes that `values` is a list or array of values. 
+    If changes are made here, also change `is_invalid_objective_time`.
+    """
+    if performance or any([isinstance(v, (str, list, tuple, np.ndarray)) for v in values]):
+        # if there are any non-numeric values, fall back to a list comprehension
+        return list([v for v in values if is_not_invalid_value(v, performance)])
+    # invalid time values can be checked for the entire array at once, much faster than iterating
+    array = np.array(values)
+    return array[(~np.isnan(array)) & (array >= 0.0)].tolist()
 
 def to_valid_array(
     results: list[dict],
@@ -115,12 +123,12 @@ def to_valid_array(
     for value_index, value in enumerate(values):
         if isinstance(value, (list, tuple, np.ndarray)):
             # if the value is an array, sum the valid values
-            array = value
-            list_to_sum = list(v for v in array if is_not_invalid_value(v, performance))    # TODO optimize this
+            list_to_sum = filter_invalids(value, performance)
             try:
+                sum_of_list = sum(list_to_sum)
                 values[value_index] = (
-                    sum(list_to_sum)
-                    if len(list_to_sum) > 0 and is_not_invalid_value(sum(list_to_sum), performance)
+                    sum_of_list
+                    if len(list_to_sum) > 0 and is_not_invalid_value(sum_of_list, performance)
                     else np.nan
                 )
             except TypeError as e:

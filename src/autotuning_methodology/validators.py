@@ -76,7 +76,7 @@ def is_invalid_objective_performance(objective_performance: float) -> bool:
 
 
 def is_invalid_objective_time(objective_time: float) -> bool:
-    """Returns whether an objective time is invalid.
+    """Returns whether an objective time is invalid. If changes are made here, also change `filter_invalids`.
 
     Args:
         objective_time: the objective time value to check.
