@@ -464,7 +464,7 @@ def generate_experiment_file(
     return experiment_file_path.resolve()
 
 
-def execute_experiment(filepath: str, profiling: bool = False):
+def execute_experiment(filepath: str, profiling: bool = False, full_validate_on_load: bool = True):
     """Executes the experiment by retrieving it from the cache or running it.
 
     Args:
@@ -545,6 +545,7 @@ def execute_experiment(filepath: str, profiling: bool = False):
                 objective_time_keys=objective_time_keys,
                 objective_performance_keys=objective_performance_keys,
                 full_search_space_file_path=full_search_space_file_path,
+                full_validate=full_validate_on_load,
             )
 
         # calculation of budget can be done only now, after searchspace statistics have been initialized

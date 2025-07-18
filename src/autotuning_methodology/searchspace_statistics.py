@@ -59,6 +59,10 @@ def is_not_invalid_value(value, performance: bool) -> bool:
     invalid_check_function = is_invalid_objective_performance if performance else is_invalid_objective_time
     return not invalid_check_function(value)
 
+def filter_invalids(values: np.ndarray, performance: bool) -> np.ndarray:
+    """Filter out invalid values from the array."""
+    return np.array([v for v in values if is_not_invalid_value(v, performance)])
+
 
 def to_valid_array(
     results: list[dict],
@@ -112,7 +116,7 @@ def to_valid_array(
         if isinstance(value, (list, tuple, np.ndarray)):
             # if the value is an array, sum the valid values
             array = value
-            list_to_sum = list(v for v in array if is_not_invalid_value(v, performance))
+            list_to_sum = list(v for v in array if is_not_invalid_value(v, performance))    # TODO optimize this
             try:
                 values[value_index] = (
                     sum(list_to_sum)
@@ -161,6 +165,7 @@ class SearchspaceStatistics:
         objective_time_keys: list[str],
         objective_performance_keys: list[str],
         full_search_space_file_path: str,
+        full_validate: bool = True,
     ) -> None:
         """Initialization method for a Searchspace statistics object.
 
@@ -181,7 +186,7 @@ class SearchspaceStatistics:
         self.full_search_space_file_path = full_search_space_file_path
 
         # load the data into the arrays
-        self.loaded = self._load()
+        self.loaded = self._load(validate=full_validate)
 
     def T4_time_keys_to_kernel_tuner_time_keys(self, time_keys: list[str]) -> list[str]:
         """Temporary utility function to use the kernel tuner search space files with the T4 output format.
@@ -408,11 +413,11 @@ class SearchspaceStatistics:
             )
         return filepath
 
-    def _load(self) -> bool:
+    def _load(self, validate=True) -> bool:
         """Load the contents of the full search space file."""
         # if not, use a script to create a file with values from KTT output and formatting of KernelTuner
         filepath = self.get_valid_filepath()
-        data = load_T4_format(filepath, validate=True)
+        data = load_T4_format(filepath, validate=validate)
         metadata: dict = data.get("metadata", {})
         timeunit = metadata.get("timeunit", "seconds")
         results: dict = data["results"]

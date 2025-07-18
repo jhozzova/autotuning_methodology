@@ -184,19 +184,20 @@ def get_strategies_aggregated_performance(
     )
 
 
-def get_strategy_scores(experiment_filepath: str, use_strategy_as_baseline=None):
+def get_strategy_scores(experiment_filepath: str, use_strategy_as_baseline=None, full_validate_on_load=True):
     """Function to get performance scores per strategy by running the passed experiments file.
 
     Args:
         experiment_filepath: the path to the experiment-filename.json to run.
         use_strategy_as_baseline: whether to use an executed strategy as the baseline. Defaults to None.
+        full_validate_on_load: whether to fully validate the T4 format file. Defaults to True.
 
     Returns:
         a dictionary of the strategies, with the performance score and error for each strategy.
     """
     # execute the experiment if necessary, else retrieve it
     experiment, strategies, searchspace_statistics, results_descriptions = execute_experiment(
-        experiment_filepath, profiling=False
+        experiment_filepath, profiling=False, full_validate_on_load=full_validate_on_load
     )
 
     # get the settings
