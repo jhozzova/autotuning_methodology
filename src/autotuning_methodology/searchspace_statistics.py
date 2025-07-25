@@ -60,9 +60,9 @@ def is_not_invalid_value(value, performance: bool) -> bool:
     return not invalid_check_function(value)
 
 def filter_invalids(values, performance: bool) -> list:
-    """Filter out invalid values from the array. 
+    """Filter out invalid values from the array.
     
-    Assumes that `values` is a list or array of values. 
+    Assumes that `values` is a list or array of values.
     If changes are made here, also change `is_invalid_objective_time`.
     """
     if performance or any([isinstance(v, (str, list, tuple, np.ndarray)) for v in values]):
@@ -184,6 +184,7 @@ class SearchspaceStatistics:
             objective_time_keys: the objective time keys used.
             objective_performance_keys: the objective performance keys used.
             full_search_space_file_path: the path to the full search space file.
+            full_validate: whether to fully validate the searchspace statistics file on load. Defaults to True.
         """
         self.loaded = False
         self.application_name = application_name

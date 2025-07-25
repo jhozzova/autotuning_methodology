@@ -470,6 +470,7 @@ def execute_experiment(filepath: str, profiling: bool = False, full_validate_on_
     Args:
         filepath: path to the experiments .json file.
         profiling: whether profiling is enabled. Defaults to False.
+        full_validate_on_load: whether to fully validate the searchspace statistics file on load. Defaults to True.
 
     Raises:
         FileNotFoundError: if the path to the kernel specified in the experiments file is not found.
