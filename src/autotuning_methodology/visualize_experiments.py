@@ -47,6 +47,7 @@ def lighten_color(color, amount: float = 0.5):
 def get_colors(strategies: list[dict]) -> list:
     """Assign colors using the tab10 colormap, with lighter shades for children."""
     tab10 = plt.get_cmap("tab10").colors
+    tab10 = [c for i, c in enumerate(tab10) if i != 1]  # remove the second color (orange) to avoid confusion with the fourth (red)
     max_parents = len(tab10)
     strategy_parents = defaultdict(list)
 
@@ -244,7 +245,7 @@ class Visualize:
         compare_split_times: bool = self.experiment["visualization_settings"]["compare_split_times"]
         confidence_level: float = self.experiment["visualization_settings"]["confidence_level"]
         self.colors = get_colors(self.strategies)
-        # self.colors = get_colors(
+        # self.colors = get_colors_old(
         #     self.strategies,
         #     scale_margin_left=self.experiment["visualization_settings"].get("color_parent_scale_margin_left", 0.4),
         #     scale_margin_right=self.experiment["visualization_settings"].get("color_parent_scale_margin_right", 0.1),
