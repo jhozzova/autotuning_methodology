@@ -211,6 +211,15 @@
                         "description": "Name for the search strategy used in visualizations",
                         "type": "string"
                     },
+                    "color_parent": {
+                        "description": "Name of the parent search strategy to use a shade of its color for this search strategy.",
+                        "type": "string"
+                    },
+                    "color_index": {
+                        "description": "Override of the index of the color in the matplotlib colormap to use for this search strategy. Only use on strategy parents. If set, all strategy parents must have it.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
                     "stochastic": {
                         "description": "Whether the repeated runs of the same experimental group (combination of application, GPU and search strategy) exhibit stochastic behaviour, e.g. due to stochastic search strategy",
                         "type": "boolean",

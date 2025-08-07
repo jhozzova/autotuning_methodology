@@ -50,11 +50,18 @@ def get_colors(strategies: list[dict]) -> list:
     tab10 = [c for i, c in enumerate(tab10) if i != 1]  # remove the second color (orange) to avoid confusion with the fourth (red)
     max_parents = len(tab10)
     strategy_parents = defaultdict(list)
+    override_index = False
 
-    # Group children under their parents
+    # Group children under their parents and check for overriden color indices
     for i, strategy in enumerate(strategies):
         if "color_parent" in strategy:
             strategy_parents[strategy["color_parent"]].append(i)
+        if "color_index" in strategy:
+            override_index = True
+            if "color_parent" in strategy:
+                raise ValueError(
+                    f"Strategy '{strategy['name']}' has both 'color_index' and 'color_parent' defined, which is not allowed."
+                )
 
     if len(strategy_parents) > max_parents:
         raise ValueError(f"Too many color parents: max supported is {max_parents} using tab10")
@@ -69,6 +76,9 @@ def get_colors(strategies: list[dict]) -> list:
             children_indices = strategy_parents[name]
             if len(children_indices) > 2:
                 raise ValueError(f"Color parent '{name}' has more than two children")
+            if override_index:
+                assert "color_index" in strategy, f"All strategies, including '{name}', must have either 'color_index' or 'color_parent' if 'color_index' is used anywhere."
+                color_index = strategy["color_index"]
             base_color = tab10[color_index]
             parent_colors[name] = {
                 idx: lighten_color(base_color, amount=0.4 + 0.3 * j) for j, idx in enumerate(children_indices)
@@ -77,6 +87,7 @@ def get_colors(strategies: list[dict]) -> list:
             color_index += 1
         elif "color_parent" in strategy:
             parent = strategy["color_parent"]
+            assert parent in parent_colors, f"Parent '{parent}' for strategy '{name}' not found in parent colors - child strategies must be defined after their parents."
             colors[i] = parent_colors[parent][i]
         else:
             if color_index >= len(tab10):
@@ -1033,8 +1044,11 @@ class Visualize:
 
             # plot the aggregation
             if style == "line" and (continue_after_comparison or not (compare_baselines or compare_split_times)):
+                # fig, axs = plt.subplots(
+                #     ncols=1, figsize=(6.8, 4.0), dpi=300
+                # )  # if multiple subplots, pass the axis to the plot function with axs[0] etc.
                 fig, axs = plt.subplots(
-                    ncols=1, figsize=(6.8, 4.0), dpi=300
+                    ncols=1, figsize=(8.5, 5.0), dpi=300
                 )  # if multiple subplots, pass the axis to the plot function with axs[0] etc.
                 if not hasattr(axs, "__len__"):
                     axs = [axs]
