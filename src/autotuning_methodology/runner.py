@@ -8,6 +8,7 @@ import os
 import time as python_time
 import warnings
 from pathlib import Path
+import pickle, gzip             # compression libraries if necessary for collecting results
 
 import numpy as np
 import progressbar
@@ -216,6 +217,7 @@ def collect_results(
     results_description: ResultsDescription,
     searchspace_stats: SearchspaceStatistics,
     profiling: bool,
+    compress: bool = True,
 ) -> ResultsDescription:
     """Executes optimization algorithms on tuning problems to capture their behaviour.
 
@@ -229,6 +231,11 @@ def collect_results(
     Returns:
         The ``ResultsDescription`` object with the results.
     """
+    if profiling:
+        import psutil, os
+        process = psutil.Process(os.getpid())
+        warnings.warn(f"Memory usage at start of collect_results: {process.memory_info().rss / 1e6:.1f} MB")
+
     # calculate the minimum number of function evaluations that must be valid
     minimum_fraction_of_budget_valid = group.get("minimum_fraction_of_budget_valid", None)
     if minimum_fraction_of_budget_valid is not None:
@@ -342,9 +349,18 @@ def collect_results(
             temp_res_filtered = list(filter(lambda config: is_valid_config_result(config), temp_results))
             only_invalid = len(temp_res_filtered) < 2  # there must be at least two valid configurations
             attempt += 1
+
+        # compress the results if necessary
+        if compress:
+            results = gzip.compress(pickle.dumps(results))
+
         # register the results
         repeated_results.append(results)
         total_time_results = np.append(total_time_results, total_time_ms)
+
+        # report the memory usage
+        if profiling:
+            warnings.warn(f"Memory usage after iteration {rep}: {process.memory_info().rss / 1e6:.1f} MB")
 
     # gather profiling data and clear the profiler before the next round
     if profiling:
@@ -353,30 +369,69 @@ def collect_results(
         path = results_description.run_folder + "/profile-v2.prof"
         stats.save(path, type="pstat")  # pylint: disable=no-member
         yappi.clear_stats()
+        warnings.warn(f"Memory usage before writing in collect_results: {process.memory_info().rss / 1e6:.1f} MB")
 
     # combine the results to numpy arrays and write to a file
-    write_results(repeated_results, results_description)
+    write_results(repeated_results, results_description, compressed=compress)
+    if profiling:
+        warnings.warn(f"Memory usage at end of of collect_results: {process.memory_info().rss / 1e6:.1f} MB")
     assert results_description.has_results(), "No results in ResultsDescription after writing results."
     return results_description
 
 
-def write_results(repeated_results: list, results_description: ResultsDescription):
+def write_results(repeated_results: list, results_description: ResultsDescription, compressed=False):
     """Combine the results and write them to a NumPy file.
 
     Args:
         repeated_results: a list of tuning results, one per tuning session.
         results_description: the ``ResultsDescription`` object to write the results to.
+        compressed: whether the repeated_results are compressed.
     """
     # get the objective value and time keys
     objective_time_keys = results_description.objective_time_keys
     objective_performance_keys = results_description.objective_performance_keys
 
-    # find the maximum number of function evaluations
-    max_num_evals = max(len(repeat) for repeat in repeated_results)
+    # find the maximum (reasonable) number of function evaluations
+    num_evals = []
+    for repeat in repeated_results:
+        if compressed:
+            repeat = pickle.loads(gzip.decompress(repeat))
+        num_evals.append(len(repeat))
+    max_num_evals = max(num_evals) if num_evals else 0
+    mean_num_evals = np.mean(num_evals) if num_evals else 0
+    if max_num_evals > mean_num_evals * 2:
+        # the maximum number of evaluations is more than twice the mean, this is likely an outlier, cut to save memory
+        max_num_evals = int(mean_num_evals * 2)
+    if max_num_evals > 1e8:
+        # more than 100 million evaluations, set to the mean number of evaluations
+        max_num_evals = int(mean_num_evals)
+
+    # set the dtype
+    dtype = np.float64
+    if max_num_evals * len(repeated_results) > 1e9:
+        warnings.warn(
+            f"More than 1 billion entries ({max_num_evals * len(repeated_results)}) in the results, using float16 to save memory."
+        )
+        dtype = np.float16
+    elif max_num_evals * len(repeated_results) > 1e8:
+        warnings.warn(
+            f"More than 100 million entries ({max_num_evals * len(repeated_results)}) in the results, using float32 to save memory."
+        )
+        dtype = np.float32
+    estimated_memory_usage = max_num_evals * len(repeated_results) * (
+        8 if dtype == np.float64 else 2 if dtype == np.float16 else 4
+    )  # 8 bytes for float64, 4 bytes for float32, 2 bytes for float16
+    if estimated_memory_usage > 1e9*10:  # more than 10 GB
+        warnings.warn(
+            f"Estimated memory usage of {estimated_memory_usage / 1e9:.2f} GB for the results arrays, may go out of memory."
+        )
 
     def get_nan_array() -> np.ndarray:
         """Get an array of NaN so they are not counted as zeros inadvertedly."""
-        return np.full((max_num_evals, len(repeated_results)), np.nan)
+        # return np.full((max_num_evals, len(repeated_results)), np.nan, dtype=dtype)
+        arr = np.empty((max_num_evals, len(repeated_results)), dtype=dtype)
+        arr.fill(np.nan)
+        return arr
 
     # set the arrays to write to
     fevals_results = get_nan_array()
@@ -384,17 +439,22 @@ def write_results(repeated_results: list, results_description: ResultsDescriptio
     objective_performance_results = get_nan_array()
     objective_performance_best_results = get_nan_array()
     objective_performance_stds = get_nan_array()
-    objective_time_results_per_key = np.full((len(objective_time_keys), max_num_evals, len(repeated_results)), np.nan)
+    objective_time_results_per_key = np.full((len(objective_time_keys), max_num_evals, len(repeated_results)), np.nan, dtype=dtype)
     objective_performance_results_per_key = np.full(
-        (len(objective_time_keys), max_num_evals, len(repeated_results)), np.nan
+        (len(objective_time_keys), max_num_evals, len(repeated_results)), np.nan, dtype=dtype
     )
 
     # combine the results
     opt_func = np.nanmin if results_description.minimization is True else np.nanmax
     for repeat_index, repeat in enumerate(repeated_results):
+        if compressed:
+            repeat = pickle.loads(gzip.decompress(repeat))
         cumulative_objective_time = 0
         objective_performance_best = np.nan
         for evaluation_index, evaluation in enumerate(repeat):
+            if evaluation_index >= max_num_evals:
+                break
+
             # set the number of function evaluations
             fevals_results[evaluation_index, repeat_index] = (
                 evaluation_index + 1

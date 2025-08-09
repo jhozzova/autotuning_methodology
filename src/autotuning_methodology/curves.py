@@ -33,6 +33,11 @@ def get_indices_in_distribution(
         A NumPy array of type float of the same shape as `draws`, with NaN where not found in `dist`.
     """
     assert dist.ndim == 1, f"distribution can not have more than one dimension, has {dist.ndim}"
+    if draws.dtype != dist.dtype:
+        warn(
+            f"Draws dtype {draws.dtype} does not match distribution dtype {dist.dtype}, converting dist to draws dtype",
+        )
+        dist = dist.astype(draws.dtype)
 
     # check whether the distribution is correctly ordered
     if not skip_dist_check:
@@ -52,7 +57,7 @@ def get_indices_in_distribution(
         assert sorter.shape == dist.shape, "The shape of the sorter must be the same as the distribution"
 
     # find the index of each draw in the distribution
-    indices_found = np.searchsorted(dist, draws, side="left", sorter=sorter).astype(float)
+    indices_found = np.searchsorted(dist, draws, side="left", sorter=sorter).astype(draws.dtype)
     assert indices_found.shape == draws.shape, "The shape of the indices must match the shape of the draws"
 
     # if indices found are outside the array, make them NaN
