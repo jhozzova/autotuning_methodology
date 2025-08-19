@@ -79,6 +79,8 @@ def get_colors(strategies: list[dict]) -> list:
             if override_index:
                 assert "color_index" in strategy, f"All strategies, including '{name}', must have either 'color_index' or 'color_parent' if 'color_index' is used anywhere."
                 color_index = strategy["color_index"]
+                if color_index >= len(tab10):
+                    raise ValueError(f"Color index {color_index} for strategy '{name}' is out of bounds for tab10 colormap (max {len(tab10) - 1})")
             base_color = tab10[color_index]
             parent_colors[name] = {
                 idx: lighten_color(base_color, amount=0.4 + 0.3 * j) for j, idx in enumerate(children_indices)
@@ -90,6 +92,9 @@ def get_colors(strategies: list[dict]) -> list:
             assert parent in parent_colors, f"Parent '{parent}' for strategy '{name}' not found in parent colors - child strategies must be defined after their parents."
             colors[i] = parent_colors[parent][i]
         else:
+            if override_index:
+                assert "color_index" in strategy, f"All strategies, including '{name}', must have either 'color_index' or 'color_parent' if 'color_index' is used anywhere."
+                color_index = strategy["color_index"]
             if color_index >= len(tab10):
                 raise ValueError("Too many unparented strategies for tab10 colormap")
             colors[i] = to_hex(tab10[color_index])
