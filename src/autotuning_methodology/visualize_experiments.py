@@ -429,6 +429,8 @@ class Visualize:
             plot_x_value_types: list[str] = plot["x_axis_value_types"]
             plot_y_value_types: list[str] = plot["y_axis_value_types"]
             annotate: bool = plot.get("annotate", True)
+            print_mean_of_columns: bool = plot.get("print_mean_of_columns", False)
+            print_mean_of_rows: bool = plot.get("print_mean_of_rows", False)
             assert len(plot_x_value_types) == 1
             assert len(plot_y_value_types) == 1
             x_type = plot_x_value_types[0]
@@ -757,6 +759,14 @@ class Visualize:
                                 color="white" if (number > 0.5 or number < -2) else "black",
                                 fontsize="small",
                             )
+                    
+                    # print extra information if requested
+                    if print_mean_of_columns:
+                        mean_of_columns = np.nanmean(plot_data, axis=0)
+                        print(f"Mean of columns for {strategy_displayname} ({x_type}): {mean_of_columns}")
+                    if print_mean_of_rows:
+                        mean_of_rows = np.nanmean(plot_data, axis=1)
+                        print(f"Mean of rows for {strategy_displayname} ({y_type}): {mean_of_rows}")
 
                     # finalize the figure and save or display it
                     fig.tight_layout()

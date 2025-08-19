@@ -461,6 +461,30 @@
                             "y_label": {
                                 "description": "Override the default generated label for the y-axis.",
                                 "type": "string"
+                            },
+                            "print_mean_of_columns": {
+                                "description": "Print the mean of the columns in the heatmap to the console.",
+                                "type": "boolean",
+                                "default": false
+                            },
+                            "print_mean_of_rows": {
+                                "description": "Print the mean of the rows in the heatmap to the console.",
+                                "type": "boolean",
+                                "default": false
+                            },
+                            "divide_train_test_axis": {
+                                "description": "Axis to divide the train and test data on in the heatmap.",
+                                "type": "string",
+                                "enum": [
+                                    "gpus",
+                                    "applications"
+                                ],
+                                "default": "gpus"
+                            },
+                            "divide_train_test_after_num": {
+                                "description": "Number of items in the divide_train_test_axis after which to divide the train and test data.",
+                                "type": "integer",
+                                "default": 3
                             }
                         }
                     }
