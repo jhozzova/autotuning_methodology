@@ -10,7 +10,7 @@ description = "Software package easing implementation of the guidelines of the 2
 keywords = ["autotuning", "auto-tuning", "methodology", "scientific"]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"       # NOTE when updating python version, also update classifiers and Nox test versions
+requires-python = ">=3.10,<4"       # NOTE when updating python version, also update classifiers and Nox test versions
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: MIT License",
@@ -31,7 +31,7 @@ dependencies = [
     "progressbar2 >= 4.2.0",
     "jsonschema >= 4.17.3",
     "nonconformist >= 2.1.0",
-    "kernel_tuner >= 1.2.0",
+    "kernel_tuner >= 1.2",
 ]
 
 [project.optional-dependencies]
