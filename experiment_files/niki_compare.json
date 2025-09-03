@@ -59,14 +59,14 @@
         {
             "name": "llamea_alg-convolution-LLaMEA-o4-mini",
             "search_method": "PRTS",
-            "display_name": "LLaMEA o4 mini convolution",
+            "display_name": "LLaMEA o4 mini convolution extra info",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-convolution-LLaMEA-o4-mini.py"
         },
         {
             "name": "llamea_alg-convolution-no-info-LLaMEA-o4-mini",
             "search_method": "TabuHarmonySearch",
-            "display_name": "LLaMEA o4 mini convolution no info",
+            "display_name": "LLaMEA o4 mini convolution",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-convolution-no-info-LLaMEA-o4-mini.py",
             "color_parent": "llamea_alg-convolution-LLaMEA-o4-mini"
@@ -74,14 +74,14 @@
         {
             "name": "llamea_alg-dedispersion-LLaMEA-o4-mini",
             "search_method": "HybridVNDX",
-            "display_name": "LLaMEA o4 mini dedispersion",
+            "display_name": "LLaMEA o4 mini dedispersion extra info",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-dedispersion-LLaMEA-o4-mini.py"
         },
         {
             "name": "llamea_alg-dedispersion-no-info-LLaMEA-o4-mini",
             "search_method": "AdaptiveBanditNeighborhoodSearch",
-            "display_name": "LLaMEA o4 mini dedispersion no info",
+            "display_name": "LLaMEA o4 mini dedispersion",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-dedispersion-no-info-LLaMEA-o4-mini.py",
             "color_parent": "llamea_alg-dedispersion-LLaMEA-o4-mini"
@@ -89,14 +89,14 @@
         {
             "name": "llamea_alg-gemm-LLaMEA-o4-mini",
             "search_method": "AdaptiveTabuGreyWolf",
-            "display_name": "LLaMEA o4 mini gemm",
+            "display_name": "LLaMEA o4 mini gemm extra info",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-gemm-LLaMEA-o4-mini.py"
         },
         {
             "name": "llamea_alg-gemm-no-info-LLaMEA-o4-mini",
             "search_method": "HierarchicalBanditVNS",
-            "display_name": "LLaMEA o4 mini gemm no info",
+            "display_name": "LLaMEA o4 mini gemm",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-gemm-no-info-LLaMEA-o4-mini.py",
             "color_parent": "llamea_alg-gemm-LLaMEA-o4-mini"
@@ -104,14 +104,14 @@
         {
             "name": "llamea_alg-hotspot-LLaMEA-o4-mini",
             "search_method": "ThompsonVNS",
-            "display_name": "LLaMEA o4 mini hotspot",
+            "display_name": "LLaMEA o4 mini hotspot extra info",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-hotspot-LLaMEA-o4-mini.py"
         },
         {
             "name": "llamea_alg-hotspot-no-info-LLaMEA-o4-mini",
             "search_method": "AdaptiveLevySA",
-            "display_name": "LLaMEA o4 mini hotspot no info",
+            "display_name": "LLaMEA o4 mini hotspot",
             "autotuner": "KernelTuner",
             "custom_search_method_path": "../llamea_gen_algs/alg-hotspot-no-info-LLaMEA-o4-mini.py",
             "color_parent": "llamea_alg-hotspot-LLaMEA-o4-mini"
