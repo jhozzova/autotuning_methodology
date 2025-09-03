@@ -14,28 +14,28 @@ from autotuning_methodology.experiments import execute_experiment
 from autotuning_methodology.searchspace_statistics import SearchspaceStatistics
 
 
-def get_aggregation_data_key(gpu_name: str, kernel_name: str):
+def get_aggregation_data_key(gpu_name: str, application_name: str):
     """Utility function to get the key for data in the aggregation data dictionary.
 
     Args:
         gpu_name: the GPU name
-        kernel_name: the kernel name
+        application_name: the application name
 
     Returns:
         The key as a string.
     """
-    return f"{gpu_name}+{kernel_name}"
+    return f"{gpu_name}+{application_name}"
 
 
 def get_aggregation_data(
     experiment_folderpath: Path,
     experiment: dict,
+    searchspace_statistics: dict[str, dict[str, SearchspaceStatistics]],
     strategies: dict,
     results_descriptions: dict,
     cutoff_percentile: float,
     cutoff_percentile_start=0.01,
     confidence_level=0.95,
-    minimization: bool = True,
     time_resolution: int = 1e4,
     use_strategy_as_baseline=None,
 ):
@@ -44,10 +44,10 @@ def get_aggregation_data(
     Args:
         experiment_folderpath: _description_
         experiment: _description_
+        searchspace_statistics: _description_
         strategies: _description_
         results_descriptions: _description_
         cutoff_percentile: _description_
-        minimization: _description_. Defaults to True.
         cutoff_percentile_start: _description_. Defaults to 0.01.
         confidence_level: _description_. Defaults to 0.95.
         time_resolution: _description_. Defaults to 1e4.
@@ -61,26 +61,19 @@ def get_aggregation_data(
     time_resolution = int(time_resolution)
 
     aggregation_data: dict[str, tuple[Baseline, list[Curve], SearchspaceStatistics, np.ndarray]] = dict()
-    for gpu_name in experiment["GPUs"]:
-        for kernel_name in experiment["kernels"]:
+    for gpu_name in experiment["experimental_groups_defaults"]["gpus"]:
+        for application_name in experiment["experimental_groups_defaults"]["applications_names"]:
             # get the statistics
-            searchspace_stats = SearchspaceStatistics(
-                kernel_name=kernel_name,
-                device_name=gpu_name,
-                minimization=minimization,
-                objective_time_keys=experiment["objective_time_keys"],
-                objective_performance_keys=experiment["objective_performance_keys"],
-                bruteforced_caches_path=experiment_folderpath / experiment["bruteforced_caches_path"],
-            )
+            searchspace_stats = searchspace_statistics[gpu_name][application_name]
 
             # get the cached strategy results as curves
             strategies_curves: list[Curve] = list()
             baseline_executed_strategy = None
             for strategy in strategies:
-                results_description = results_descriptions[gpu_name][kernel_name][strategy["name"]]
+                results_description = results_descriptions[gpu_name][application_name][strategy["name"]]
                 if results_description is None:
                     raise ValueError(
-                        f"""Strategy {strategy['display_name']} not in results_description,
+                        f"""Strategy {strategy["display_name"]} not in results_description,
                             make sure execute_experiment() has ran first"""
                     )
                 curve = StochasticOptimizationAlgorithm(results_description)
@@ -91,11 +84,10 @@ def get_aggregation_data(
                 raise ValueError(f"Could not find '{use_strategy_as_baseline}' in executed strategies")
 
             # set the x-axis range
-            _, cutoff_point_fevals, cutoff_point_time = searchspace_stats.cutoff_point_fevals_time(cutoff_percentile)
-            _, cutoff_point_fevals_start, cutoff_point_time_start = searchspace_stats.cutoff_point_fevals_time(
-                cutoff_percentile_start
+            cutoff_point_fevals_start, cutoff_point_fevals, cutoff_point_time_start, cutoff_point_time = (
+                searchspace_stats.cutoff_point_fevals_time_start_end(cutoff_percentile_start, cutoff_percentile)
             )
-            fevals_range = np.arange(start=cutoff_point_fevals_start, stop=cutoff_point_fevals)
+            fevals_range = np.arange(start=cutoff_point_fevals_start, stop=cutoff_point_fevals + 1)
             time_range = np.linspace(start=cutoff_point_time_start, stop=cutoff_point_time, num=time_resolution)
 
             # get the random baseline
@@ -108,7 +100,7 @@ def get_aggregation_data(
             )
 
             # collect aggregatable data
-            aggregation_data[get_aggregation_data_key(gpu_name, kernel_name)] = tuple(
+            aggregation_data[get_aggregation_data_key(gpu_name, application_name)] = tuple(
                 [random_baseline, strategies_curves, searchspace_stats, time_range, fevals_range]
             )
 
@@ -192,48 +184,68 @@ def get_strategies_aggregated_performance(
     )
 
 
-def get_strategy_scores(experiment_filepath: str, use_strategy_as_baseline=None):
+def get_strategy_scores(experiment_filepath: str, use_strategy_as_baseline=None, full_validate_on_load=True):
     """Function to get performance scores per strategy by running the passed experiments file.
 
     Args:
         experiment_filepath: the path to the experiment-filename.json to run.
         use_strategy_as_baseline: whether to use an executed strategy as the baseline. Defaults to None.
+        full_validate_on_load: whether to fully validate the T4 format file. Defaults to True.
 
     Returns:
         a dictionary of the strategies, with the performance score and error for each strategy.
     """
     # execute the experiment if necessary, else retrieve it
-    experiment, strategies, results_descriptions = execute_experiment(experiment_filepath, profiling=False)
-    experiment_folderpath = Path(experiment_filepath).parent
-
-    # get the settings
-    minimization: bool = experiment.get("minimization", True)
-    cutoff_percentile: float = experiment["cutoff_percentile"]
-    cutoff_percentile_start: float = experiment.get("cutoff_percentile_start", 0.01)
-    time_resolution: float = experiment.get("resolution", 1e4)
-    confidence_level: float = experiment["plot"].get("confidence_level", 0.95)
-
-    # aggregate the data
-    aggregation_data = get_aggregation_data(
-        experiment_folderpath,
-        experiment,
-        strategies,
-        results_descriptions,
-        cutoff_percentile,
-        cutoff_percentile_start,
-        confidence_level,
-        minimization,
-        time_resolution,
-        use_strategy_as_baseline,
+    experiment, strategies, searchspace_statistics, results_descriptions = execute_experiment(
+        experiment_filepath, profiling=False, full_validate_on_load=full_validate_on_load
     )
 
-    # get the aggregated performance per strategy
-    (
-        strategies_performance,
-        strategies_lower_err,
-        strategies_upper_err,
-        strategies_real_stopping_point_fraction,
-    ) = get_strategies_aggregated_performance(list(aggregation_data.values()), confidence_level)
+    # get the settings
+    experiment_folderpath = experiment["parent_folder_absolute_path"]
+    cutoff_percentile: float = experiment["statistics_settings"]["cutoff_percentile"]
+    cutoff_percentile_start: float = experiment["statistics_settings"]["cutoff_percentile_start"]
+    time_resolution: float = experiment["visualization_settings"]["resolution"]
+    confidence_level: float = experiment["visualization_settings"]["confidence_level"]
+
+    # aggregate the data
+    def get_agg_data():
+        return get_aggregation_data(
+            experiment_folderpath,
+            experiment,
+            searchspace_statistics,
+            strategies,
+            results_descriptions,
+            cutoff_percentile,
+            cutoff_percentile_start,
+            confidence_level,
+            time_resolution,
+            use_strategy_as_baseline,
+        )
+
+    try:
+        # get the aggregated performance per strategy
+        aggregation_data = get_agg_data()
+        strategies_performance, _, _, _ = get_strategies_aggregated_performance(
+            list(aggregation_data.values()), confidence_level
+        )
+    except ValueError as e:
+        if "Not enough overlap in time range and time values" in str(e.args[0]):
+            # delete the broken cachefile
+            _, strategy_name, application_name, device_name = e.args
+            assert results_descriptions[device_name][application_name][strategy_name].delete(), (
+                "Failed to delete cachefile"
+            )
+
+            # re-execute the experiment and recollect the data to see if the issue is resolved
+            experiment, strategies, searchspace_statistics, results_descriptions = execute_experiment(
+                experiment_filepath, profiling=False
+            )
+            aggregation_data = get_agg_data()
+            strategies_performance, _, _, _ = get_strategies_aggregated_performance(
+                list(aggregation_data.values()), confidence_level
+            )
+        else:
+            raise e
 
     # calculate the average performance score and error per strategy
     results: dict[str, dict[str, float]] = dict()

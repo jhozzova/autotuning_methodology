@@ -8,9 +8,9 @@ from autotuning_methodology.curves import Curve, get_indices_in_array, get_indic
 
 def test_get_indices_in_distribution():
     """Each draw should have the same value as the associated value in the distribution."""
-    draws = np.array([[4, np.NaN, 5], [1, 2, 4.5]])
+    draws = np.array([[4, np.nan, 5], [1, 2, 4.5]])
     dist = np.array([1, 2, 4, 4, 4.5, 5])
-    expected_indices = np.array([[2, np.NaN, 5], [0, 1, 4]])
+    expected_indices = np.array([[2, np.nan, 5], [0, 1, 4]])
 
     indices_found = get_indices_in_distribution(draws=draws, dist=dist)
 
@@ -31,16 +31,16 @@ def test_get_indices_in_distribution():
 
 def test_get_indices_in_distribution_check_dist():
     """Dist order should be checked by default and dist should not contain NaN."""
-    draws = np.array([[4, np.NaN, 5], [1, 2, 4.5]])
+    draws = np.array([[4, np.nan, 5], [1, 2, 4.5]])
     with pytest.raises(AssertionError, match="2 violations in 5 values"):
-        get_indices_in_distribution(draws=draws, dist=np.array([1, 2, np.NaN, 4, 4.5]))
+        get_indices_in_distribution(draws=draws, dist=np.array([1, 2, np.nan, 4, 4.5]))
     with pytest.raises(AssertionError, match="1 violations in 4 values"):
         get_indices_in_distribution(draws=draws, dist=np.array([5, 4, 6, 7]))
 
 
 def test_get_indices_in_distribution_check_draws():
     """Values in draw (with the exception of NaN) that are not in dist should throw an exception."""
-    draws = np.array([[4, np.NaN, 3], [1, 2, 4.5]])
+    draws = np.array([[4, np.nan, 3], [1, 2, 4.5]])
     dist = np.array([1, 2, 4, 4, 4.5, 5])
     with pytest.raises(AssertionError, match="Each value in draws should be in dist"):
         get_indices_in_distribution(draws=draws, dist=dist)
@@ -48,9 +48,9 @@ def test_get_indices_in_distribution_check_draws():
 
 def test_get_indices_in_array():
     """Each value should have the same value as the associated value in the unsorted array."""
-    draws = np.array([[4, np.NaN, 5], [1, 2, 4.5]])
+    draws = np.array([[4, np.nan, 5], [1, 2, 4.5]])
     dist = np.array([4, 2, 1, 4, 5, 4.5])
-    expected_indices = np.array([[0, np.NaN, 4], [2, 1, 5]])
+    expected_indices = np.array([[0, np.nan, 4], [2, 1, 5]])
 
     indices_found = get_indices_in_array(values=draws, array=dist)
 

@@ -1,21 +1,25 @@
 """Main experiments code."""
 
-from __future__ import annotations  # for correct nested type hints e.g. list[str], tuple[dict, str]
+from __future__ import (
+    annotations,  # for correct nested type hints e.g. list[str], tuple[dict, str]
+)
 
 import json
-import sys
 from argparse import ArgumentParser
-from importlib import import_module
-from importlib.resources import files
 from math import ceil
-from os import getcwd
+from os import getcwd, makedirs
 from pathlib import Path
+from random import randint
 
-from jsonschema import validate
+from jsonschema import ValidationError
 
 from autotuning_methodology.caching import ResultsDescription
 from autotuning_methodology.runner import collect_results
 from autotuning_methodology.searchspace_statistics import SearchspaceStatistics
+from autotuning_methodology.validators import validate_experimentsfile
+from autotuning_methodology.formats_interface import load_T4_format
+
+PACKAGE_ROOT = Path(__file__).parent.parent.parent
 
 
 def get_args_from_cli(args=None) -> str:
@@ -30,26 +34,31 @@ def get_args_from_cli(args=None) -> str:
     Returns:
         The filepath to the experiments file.
     """
-    CLI = ArgumentParser()
-    CLI.add_argument("experiment", type=str, help="The experiment.json to execute, see experiments/template.json")
-    args = CLI.parse_args(args)
+    cli = ArgumentParser()
+    cli.add_argument(
+        "experiment", type=str, help="The experiment setup json file to execute, see experiments/template.json"
+    )
+    args = cli.parse_args(args)
     filepath: str = args.experiment
     if filepath is None or filepath == "":
-        raise ValueError(
-            "Invalid '-experiment' option. Run 'visualize_experiments.py -h' to read more about the options."
-        )
+        raise ValueError("Invalid '--experiment' option. Run 'visualize_experiments.py -h' to read more.")
     return filepath
 
 
-def get_experiment_schema_filepath():
-    """Obtains and checks the filepath to the JSON schema.
-
-    Returns:
-        the filepath to the schema in Traversable format.
-    """
-    schemafile = files("autotuning_methodology").joinpath("schema.json")
-    assert schemafile.is_file(), f"Path to schema.json does not exist, attempted path: {schemafile}"
-    return schemafile
+def make_and_check_path(filename: str, parent=None, extension=None) -> Path:
+    """Checks if the file exists, if not, tries to add the extension."""
+    filename_path = Path(filename)
+    if filename_path.is_absolute() is False and parent is not None:
+        filename_path = PACKAGE_ROOT / Path(parent).joinpath(filename).resolve()
+    if filename_path.exists():
+        return filename_path
+    # try and add extension
+    if extension is None:
+        raise FileNotFoundError(f"{filename_path.resolve()} does not exist.")
+    filename_path = Path(str(filename_path) + extension)
+    if filename_path.exists():
+        return filename_path
+    raise FileNotFoundError(f"{filename_path.resolve()} does not exist.")
 
 
 def get_experiment(filename: str) -> dict:
@@ -73,153 +82,506 @@ def get_experiment(filename: str) -> dict:
     #     path = Path(filename)
     assert path.exists(), f"Path to experiment file does not exist, attempted path: {path}, CWD: {getcwd()}"
 
-    # get the path to the schema
-    schemafile = get_experiment_schema_filepath()
-
     # open the experiment file and validate using the schema file
-    with open(path, "r", encoding="utf-8") as file, open(schemafile, "r", encoding="utf-8") as schemafile:
-        schema = json.load(schemafile)
+    with path.open("r", encoding="utf-8") as file:
         experiment: dict = json.load(file)
-        validate(instance=experiment, schema=schema)
-        return experiment
+        try:
+            validate_experimentsfile(experiment)
+            return experiment
+        except ValidationError as e:
+            print(e)
+            raise ValidationError("Experiment file does not comply with schema")
 
 
-def get_strategies(experiment: dict) -> dict:
-    """Gets the strategies from an experiments file by augmenting it with the defaults.
+def get_experimental_groups(experiment: dict) -> list[dict]:
+    """Prepares all the experimental groups as all combinations of application and gpus (from experimental_groups_defaults) and big experimental groups from setup file (experimental_groups, usually search methods). Check additional settings for each experimental group. Prepares the directory structure for the whole experiment.
 
     Args:
         experiment: the experiment dictionary object.
 
     Returns:
-        The strategies in the experiment dictionary object, augmented where necessery.
+        The experimental groups in the experiment dictionary object.
     """
-    strategy_defaults = experiment["strategy_defaults"]
-    strategies = experiment["strategies"]
-    # # get a baseline index if it exists
-    # baseline_index = list(
-    #     strategy_index for strategy_index, strategy in enumerate(strategies) if "is_baseline" in strategy
-    # )
-    # if len(baseline_index) != 1:
-    #     raise ValueError(f"There must be exactly one baseline, found {len(baseline_index)} baselines")
-    # if strategies[baseline_index[0]]["is_baseline"] is not True:
-    #     raise ValueError(f"is_baseline must be true, yet is set to {strategies[0]['is_baseline']}!")
-    # # if the baseline index is not 0, put the baseline strategy first
-    # if baseline_index[0] != 0:
-    #     raise ValueError("The baseline strategy must be the first strategy in the experiments file!")
-    #     # strategies.insert(0, strategies.pop(baseline_index[0]))
+    experimental_groups_defaults = experiment["experimental_groups_defaults"]
+    search_strategies = experiment["search_strategies"]
 
-    # augment the strategies with the defaults
-    for strategy in strategies:
-        for default in strategy_defaults:
-            if default not in strategy:
-                strategy[default] = strategy_defaults[default]
-    return strategies
+    # set up the directory structure
+    experiment["parent_folder_absolute_path"] = Path(experiment["parent_folder"]).resolve()
+    # if folders "run" and "setup" do not exist, create
+    makedirs(experiment["parent_folder_absolute_path"].joinpath("run"), exist_ok=True)
+    makedirs(experiment["parent_folder_absolute_path"].joinpath("setup"), exist_ok=True)
+
+    # create folders for each experimental group from file
+    for strategy in search_strategies:
+        makedirs(experiment["parent_folder_absolute_path"].joinpath("run").joinpath(strategy["name"]), exist_ok=True)
+
+    # generate all experimental groups
+    # with applications and gpus provided in experimental_groups_defaults
+    # and search strategies provided in search_strategies
+    all_experimental_groups = generate_all_experimental_groups(
+        search_strategies, experimental_groups_defaults, experiment["parent_folder_absolute_path"]
+    )
+
+    # additional check beyond validation
+    # if every experimental group has autotuner set
+    # set autotuner_path to default installation if not set by the user
+    for group in all_experimental_groups:
+        if group.get("autotuner") is None:
+            raise KeyError(
+                "Property 'autotuner' must be set for all groups, either in experimental_groups_defaults or in experimental_groups. It is not set for",
+                group["full_name"],
+            )
+        if group["autotuner"] == "KTT":
+            if group["samples"] != 1:
+                raise NotImplementedError(
+                    "KTT currently supports only one sample per run and output. Please set samples=1 for group['full_name']."
+                )
+            if group.get("autotuner_path") is None:
+                raise NotImplementedError(
+                    "Default autotuner_path is not supported yet for KTT, please set autotuner_path for ",
+                    group["full_name"]
+                    + " to directory with KttTuningLauncher and pyktt.so, e.g. /home/user/KTT/Build/x86_64_Release.",
+                )
+            elif Path(group["autotuner_path"]).exists() is False:
+                raise FileNotFoundError(
+                    f"Directory {group['autotuner_path']} does not exists. Try setting the absolute path."
+                )
+            elif Path(group["autotuner_path"]).joinpath("KttTuningLauncher").exists() is False:
+                raise FileNotFoundError(
+                    f"Directory {group['autotuner_path']} does not contain KttTuningLauncher. Have you used --tuning-loader when premaking KTT?"
+                )
+            elif Path(group["autotuner_path"]).joinpath("pyktt.so").exists() is False:
+                raise FileNotFoundError(
+                    f"Directory {group['autotuner_path']} does not contain pyktt.so. Have you used --python when premaking KTT?"
+                )
+            # TODO make and set default autotuner path
+
+    return all_experimental_groups
 
 
-def execute_experiment(filepath: str, profiling: bool = False) -> tuple[dict, dict, dict]:
+def generate_all_experimental_groups(
+    search_strategies: list[dict], experimental_groups_defaults: dict, parent_folder_path: Path
+) -> list[dict]:
+    """Generates all experimental groups for the experiment as a combination of given applications, gpus and search strategies from experiments setup file.
+
+    Args:
+        search_strategies: list of dictionaries with settings for various search strategies from experiments setup file, section search_strategies.
+        experimental_groups_defaults: a dictionary with default settings for experimental groups from experiments setup file, section experimental_groups_defaults.
+        parent_folder_path: path to experiment parent folder that stores all files generated in the experiment.
+
+    Returns:
+        A list of dictionaries, one for each experimental group.
+    """
+    experimental_groups = []
+
+    for gpu in experimental_groups_defaults["gpus"]:
+        for application in experimental_groups_defaults["applications"]:
+            for strategy in search_strategies:
+                group = strategy.copy()
+
+                for default in experimental_groups_defaults:
+                    if default not in group and default not in [
+                        "applications",
+                        "gpus",
+                        "pattern_for_full_search_space_filenames",
+                    ]:
+                        group[default] = experimental_groups_defaults[default]
+
+                group["full_name"] = "_".join([gpu, application["name"], group["name"]])
+
+                group["gpu"] = gpu
+                group["application_name"] = application["name"]
+
+                group["application_folder"] = Path(application["folder"])
+                group["application_input_file"] = make_and_check_path(
+                    application["input_file"], application["folder"], None
+                )
+                group["input_file"] = parent_folder_path.joinpath("setup").joinpath(
+                    "_".join([group["full_name"], "input.json"])
+                )
+                group["parent_folder_path"] = parent_folder_path
+
+                if experimental_groups_defaults.get("pattern_for_full_search_space_filenames") is None:
+                    group["full_search_space_file"] = get_full_search_space_filename_from_input_file(
+                        group["application_input_file"]
+                    )
+                else:
+                    group["full_search_space_file"] = get_full_search_space_filename_from_pattern(
+                        experimental_groups_defaults["pattern_for_full_search_space_filenames"],
+                        gpu,
+                        application["name"],
+                    )
+
+                # get the objective performance keys
+                if "objective_performance_keys" in application:
+                    group["objective_performance_keys"] = application["objective_performance_keys"]
+                else:
+                    # load the full search space file and derive the objective performance keys
+                    print(
+                        f"Loading full search space file {group['full_search_space_file']} to infer the objective performance keys. Consider setting them explicititely in the experiments file."
+                    )
+                    data = load_T4_format(group["full_search_space_file"], validate=True)
+                    objectives = data["results"][0]["objectives"]
+                    assert len(objectives) == 1, "Only one objective is supported for now"
+                    group["objective_performance_keys"] = objectives
+                objective = group["objective_performance_keys"][0]
+
+                # derive the optimization direction
+                if "minimization" in application:
+                    group["minimization"] = application["minimization"]
+                elif "time" in objective.lower():
+                    group["minimization"] = True
+                elif any(k in objective.lower() for k in ["score", "gflop/s", "gflops", "gb/s"]):
+                    group["minimization"] = False
+                else:
+                    raise NotImplementedError(
+                        f"Optimization direction can not be automatically inferred from '{objective=}' ({gpu=}, {application=}, {strategy=}). Please set 'minimization' for this application in the experiments file."
+                    )
+
+                if group["autotuner"] == "KTT":
+                    raise NotImplementedError(
+                        "KTT is working on supporting the shared interface. The old conversions have been deprecated. An older build can be used to use these functions."
+                    )
+
+                group["output_file"]: Path = (
+                    parent_folder_path.joinpath("run")
+                    .joinpath(group["name"])
+                    .joinpath(group["full_name"] + ".json")
+                    .resolve()
+                )
+
+                generate_input_file(group)
+                experimental_groups.append(group)
+
+    return experimental_groups
+
+
+def get_full_search_space_filename_from_input_file(input_filename: Path) -> Path:
+    """Returns a path to full search space file that is provided in the input json file in KernelSpecification.SimulationInput.
+
+    Args:
+        input_filename: path to input json file.
+
+    Raises:
+        KeyError: if the path is not provided, but is expected.
+
+    Returns:
+        A path to full search space file that was written in the input json file.
+    """
+    with open(input_filename, "r", encoding="utf-8") as input_file:
+        input_json = json.load(input_file)
+        if input_json["KernelSpecification"].get("SimulationInput") is None:
+            raise KeyError(
+                "SimulationInput, i.e. full search space file is expected and not defined in",
+                input_filename,
+                ". Please set the path to that file in KernelSpecification.SimulationInput in input json file or set pattern_for_full_search_space_filename in experiments setup json file.",
+            )
+        full_search_space_filename = make_and_check_path(
+            input_json["KernelSpecification"]["SimulationInput"], str(input_filename.parent), ".json"
+        )
+    # need to return filename WITHOUT .json, KTT (and probably also others) needs that in SimulationInput in input json as other autotuner can take other formats
+    return full_search_space_filename.parent.joinpath(full_search_space_filename.stem)
+
+
+def get_full_search_space_filename_from_pattern(pattern: dict, gpu: str, application_name: str) -> Path:
+    """Returns a path to full search space file that is generated from the pattern provided in experiments setup file.
+
+    Args:
+        pattern: pattern regex string
+        gpu: name of the gpu, needs to be plugged into the pattern
+        application_name: name of the application, needs to be plugged into the pattern
+
+    Raises:
+        NotImplementedError: if the regex expects other variables than just application name and gpu.
+
+    Returns:
+        A path to full search file generated from the pattern.
+    """
+    filename = pattern["regex"].replace("${applications}", application_name).replace("${gpus}", gpu)
+    if "${" in filename:
+        raise NotImplementedError(
+            f"Variables other than applications and gpus are not yet supported for pattern matching. Unresolved: {filename}."
+        )
+    full_search_space_filename = make_and_check_path(filename)
+    return full_search_space_filename
+
+
+def calculate_budget(group: dict, statistics_settings: dict, searchspace_stats: SearchspaceStatistics) -> dict:
+    """Calculates the budget for the experimental group, given cutoff point provided in experiments setup file.
+
+    Args:
+        group: a dictionary with settings for experimental group
+        statistics_settings: a dictionary with settings related to statistics
+        searchspace_stats: a SearchspaceStatistics instance with cutoff points determined from related full search space files
+
+    Returns:
+        A modified group dictionary.
+    """
+    # get cutoff points
+    _, cutoff_point_fevals, cutoff_point_start_time, cutoff_point_time = (
+        searchspace_stats.cutoff_point_fevals_time_start_end(
+            statistics_settings["cutoff_percentile_start"], statistics_settings["cutoff_percentile"]
+        )
+    )
+
+    # +10% margin, to make sure cutoff_point is reached by compensating for potential non-valid evaluations  # noqa: E501
+    cutoff_margin = group.get("cutoff_margin", 0.1)
+
+    # register in the group
+    group["budget"] = {}
+    group["cutoff_times"] = {
+        "cutoff_time_start": max(cutoff_point_start_time, 0.0)
+        if statistics_settings["cutoff_percentile_start"] > 0.0
+        else 0.0,
+        "cutoff_time": cutoff_point_time * (1 + cutoff_margin),
+    }
+
+    # set when to stop
+    if statistics_settings["cutoff_type"] == "time":
+        group["budget"]["time_limit"] = group["cutoff_times"]["cutoff_time"]
+    else:
+        budget = min(int(ceil(cutoff_point_fevals * (1 + cutoff_margin))), searchspace_stats.size)
+        group["budget"]["max_fevals"] = budget
+
+    # write to group's input file as Budget
+    with open(group["input_file"], "r", encoding="utf-8") as fp:
+        input_json = json.load(fp)
+        if input_json.get("Budget") is None:
+            input_json["Budget"] = []
+            input_json["Budget"].append({})
+        if group["budget"].get("time_limit") is not None:
+            input_json["Budget"][0]["Type"] = "TuningDuration"
+            input_json["Budget"][0]["BudgetValue"] = group["budget"]["time_limit"]
+        else:  # it's max_fevals
+            input_json["Budget"][0]["Type"] = "ConfigurationCount"
+            input_json["Budget"][0]["BudgetValue"] = group["budget"]["max_fevals"]
+
+    # write the results and return the adjusted group
+    with open(group["input_file"], "w", encoding="utf-8") as fp:
+        json.dump(input_json, fp, indent=4)
+    return group
+
+
+def generate_input_file(group: dict):
+    """Creates a input json file specific for a given application, gpu and search method.
+
+    Args:
+        group: dictionary with settings for a given experimental group.
+    """
+    with open(group["application_input_file"], "r", encoding="utf-8") as fp:
+        input_json = json.load(fp)
+        input_json["KernelSpecification"]["SimulationInput"] = str(group["full_search_space_file"])
+
+        # TODO dirty fix below for Kernel Tuner compatibility, instead implement reading T4 as cache in Kernel Tuner
+        input_json["KernelSpecification"]["SimulationInput"] = str(
+            input_json["KernelSpecification"]["SimulationInput"]
+        ).replace("_T4", "")
+
+        input_json["General"]["OutputFile"] = str(group["output_file"].parent.joinpath(group["output_file"].stem))
+        if input_json["General"]["OutputFormat"] != "JSON":
+            raise RuntimeError(
+                f"Only JSON output format is supported. Please set General.OutputFormat to JSON in {group['application_input_file']}."
+            )
+        if "TimeUnit" not in input_json["General"]:
+            input_json["General"]["TimeUnit"] = "Milliseconds"
+        if input_json["KernelSpecification"].get("Device") is None:
+            input_json["KernelSpecification"]["Device"] = {}
+            input_json["KernelSpecification"]["Device"]["Name"] = group["gpu"]
+        else:
+            input_json["KernelSpecification"]["Device"]["Name"] = group["gpu"]
+        input_json["KernelSpecification"]["KernelFile"] = str(
+            Path(
+                Path(group["application_input_file"]).parent / Path(input_json["KernelSpecification"]["KernelFile"])
+            ).resolve()
+        )
+
+        input_json["Search"] = {}
+        input_json["Search"]["Name"] = group["search_method"]
+        if group.get("search_method_hyperparameters") is not None:
+            input_json["Search"]["Attributes"] = []
+            for param in group["search_method_hyperparameters"]:
+                attribute = {}
+                attribute["Name"] = param["name"]
+                attribute["Value"] = param["value"]
+                input_json["Search"]["Attributes"].append(attribute)
+    # note that this is written to a different file, specific for gpu, application and search method
+    with open(group["input_file"], "w", encoding="utf-8") as fp:
+        json.dump(input_json, fp, indent=4)
+
+
+def get_random_unique_filename(prefix="", suffix=""):
+    """Get a random, unique filename that does not yet exist."""
+
+    def randpath():
+        return Path(f"{prefix}{randint(1000, 9999)}{suffix}")
+
+    path = randpath()
+    while path.exists():
+        path = randpath()
+    return path
+
+
+def generate_experiment_file(
+    name: str,
+    parent_folder: Path,
+    search_strategies: list[dict],
+    applications: list[dict] = None,
+    gpus: list[str] = None,
+    override: dict = None,
+    generate_unique_file=False,
+    overwrite_existing_file=False,
+):
+    """Creates an experiment file based on the given inputs and opinionated defaults."""
+    assert isinstance(name, str) and len(name) > 0, f"Name for experiment file must be valid, is '{name}'"
+    experiment_file_path = Path(f"./{name.replace(' ', '_')}.json")
+    if generate_unique_file is True:
+        experiment_file_path = get_random_unique_filename(f"{name.replace(' ', '_')}_", ".json")
+    if experiment_file_path.exists():
+        if overwrite_existing_file is False:
+            raise FileExistsError(f"Experiments file '{experiment_file_path}' already exists")
+    defaults_path = Path(__file__).parent / "experiments_defaults.json"
+    with defaults_path.open() as fp:
+        experiment: dict = json.load(fp)
+
+    # write the arguments to the experiment file
+    experiment["name"] = name
+    experiment["parent_folder"] = str(parent_folder.resolve())
+    experiment["search_strategies"] = search_strategies
+    if applications is not None:
+        experiment["experimental_groups_defaults"]["applications"] = applications
+    if gpus is not None:
+        experiment["experimental_groups_defaults"]["gpus"] = gpus
+    if override is not None:
+        for key, value in override.items():
+            experiment[key].update(value)
+
+    # validate and write to experiments file
+    validate_experimentsfile(experiment)
+    with experiment_file_path.open("w", encoding="utf-8") as fp:
+        json.dump(experiment, fp)
+
+    # return the location of the experiments file
+    return experiment_file_path.resolve()
+
+
+def execute_experiment(filepath: str, profiling: bool = False, full_validate_on_load: bool = True):
     """Executes the experiment by retrieving it from the cache or running it.
 
     Args:
         filepath: path to the experiments .json file.
         profiling: whether profiling is enabled. Defaults to False.
+        full_validate_on_load: whether to fully validate the searchspace statistics file on load. Defaults to True.
 
     Raises:
         FileNotFoundError: if the path to the kernel specified in the experiments file is not found.
 
     Returns:
-        A tuple of the experiment dictionary, the strategies executed, and the resulting list of ``ResultsDescription``.
+        A tuple of the experiment dictionary, the experimental groups executed, the dictionary of ``Searchspace statistics`` and the resulting list of ``ResultsDescription``.
     """
     experiment = get_experiment(filepath)
-    experiment_folderpath = Path(filepath).parent
+    experiment_folderpath = Path(experiment["parent_folder"])
     print(f"Starting experiment '{experiment['name']}'")
-    experiment_folder_id: str = experiment["folder_id"]
-    minimization: bool = experiment.get("minimization", True)
-    cutoff_percentile: float = experiment.get("cutoff_percentile", 1)
-    cutoff_type: str = experiment.get("cutoff_type", "fevals")
-    assert cutoff_type == "fevals" or cutoff_type == "time", f"cutoff_type must be 'fevals' or 'time', is {cutoff_type}"
-    curve_segment_factor: float = experiment.get("curve_segment_factor", 0.05)
-    assert isinstance(curve_segment_factor, float), f"curve_segment_factor is not float, {type(curve_segment_factor)}"
-    strategies: list[dict] = get_strategies(experiment)
 
-    # add the kernel directory to the path to import the module, relative to the experiment file
-    kernels_path = experiment_folderpath / Path(experiment["kernels_path"])
-    if not kernels_path.exists():
-        raise FileNotFoundError(f"No such path {kernels_path.resolve()}, CWD: {getcwd()}")
-    sys.path.append(str(kernels_path))
-    kernel_names = experiment["kernels"]
-    kernels = list(import_module(kernel_name) for kernel_name in kernel_names)
+    all_experimental_groups = get_experimental_groups(experiment)
 
-    # variables for comparison
-    objective_time_keys: list[str] = experiment["objective_time_keys"]
-    objective_performance_keys: list[str] = experiment["objective_performance_keys"]
+    # prepare objective_time_keys, in case it was defined as all, explicitly list all keys
+    objective_time_keys: list[str] = experiment["statistics_settings"]["objective_time_keys"]
+    if "all" in objective_time_keys:
+        objective_time_keys = []
+        # open the experiment file and validate using the schema file
+        schema = validate_experimentsfile(experiment)
+        objective_time_keys = schema["properties"]["statistics_settings"]["properties"]["objective_time_keys"]["items"][
+            "enum"
+        ]
+        objective_time_keys.remove("all")
+        experiment["statistics_settings"]["objective_time_keys"] = objective_time_keys
 
-    # execute each strategy in the experiment per GPU and kernel
-    results_descriptions: dict[str, dict[str, dict[str, ResultsDescription]]] = dict()
-    gpu_name: str
-    for gpu_name in experiment["GPUs"]:
-        print(f" | running on GPU '{gpu_name}'")
-        results_descriptions[gpu_name] = dict()
-        for index, kernel in enumerate(kernels):
-            kernel_name = kernel_names[index]
-            searchspace_stats = SearchspaceStatistics(
-                kernel_name=kernel_name,
+    experiment["experimental_groups_defaults"]["applications_names"] = []
+    for application in experiment["experimental_groups_defaults"]["applications"]:
+        experiment["experimental_groups_defaults"]["applications_names"].append(application["name"])
+
+    # initialize the matrix of results_descriptions based on provided gpus and applications
+    # initialize searchspace statistics, one for each full search file
+    results_descriptions: dict[str, dict[str, dict[str, ResultsDescription]]] = {}
+    searchspace_statistics: dict[str, dict[str, SearchspaceStatistics]] = {}
+
+    for gpu in experiment["experimental_groups_defaults"]["gpus"]:
+        results_descriptions[gpu] = {}
+        searchspace_statistics[gpu] = {}
+        for application in experiment["experimental_groups_defaults"]["applications_names"]:
+            results_descriptions[gpu][application] = {}
+
+    # just iterate over experimental_groups, collect results and write to proper place
+    for group in all_experimental_groups:
+        # get the experimental group settings
+        application_name = group["application_name"]
+        gpu_name = group["gpu"]
+        minimization = group["minimization"]
+        objective_performance_keys = group["objective_performance_keys"]
+
+        # show the progress in the console
+        print(f" | - running on GPU '{gpu_name}'")
+        print(f" | - | tuning application '{application_name}'")
+        print(f" | - | - | with settings of experimental group '{group['display_name']}'")
+
+        # overwrite the experiment statistics settings with the group settings
+        experiment["statistics_settings"]["minimization"] = minimization
+        experiment["statistics_settings"]["objective_performance_keys"] = objective_performance_keys
+
+        # create SearchspaceStatistics for full search space file associated with this group, if it does not exist
+        if any(
+            searchspace_statistics.get(group["gpu"], {}).get(group["application_name"], {}) == null_val
+            for null_val in [None, {}]
+        ):
+            full_search_space_file_path = None
+            if group.get("converted_full_search_space_file") is None:
+                full_search_space_file_path = group["full_search_space_file"]
+            else:
+                full_search_space_file_path = group["converted_full_search_space_file"]
+
+            searchspace_statistics[gpu_name][application_name] = SearchspaceStatistics(
+                application_name=application_name,
                 device_name=gpu_name,
                 minimization=minimization,
                 objective_time_keys=objective_time_keys,
                 objective_performance_keys=objective_performance_keys,
-                bruteforced_caches_path=experiment_folderpath / experiment["bruteforced_caches_path"],
+                full_search_space_file_path=full_search_space_file_path,
+                full_validate=full_validate_on_load,
             )
 
-            # set cutoff point
-            _, cutoff_point_fevals, cutoff_point_time = searchspace_stats.cutoff_point_fevals_time(cutoff_percentile)
+        # calculation of budget can be done only now, after searchspace statistics have been initialized
+        group = calculate_budget(
+            group, experiment["statistics_settings"], searchspace_statistics[group["gpu"]][group["application_name"]]
+        )
 
-            print(f" | - optimizing kernel '{kernel_name}'")
-            results_descriptions[gpu_name][kernel_name] = dict()
-            for strategy in strategies:
-                strategy_name: str = strategy["name"]
-                strategy_display_name: str = strategy["display_name"]
-                stochastic = strategy["stochastic"]
-                cutoff_margin = strategy.get(
-                    "cutoff_margin", 1.1
-                )  # +10% margin, to make sure cutoff_point is reached by compensating for potential non-valid evaluations  # noqa: E501
-                print(f" | - | using strategy '{strategy['display_name']}'")
+        results_description = ResultsDescription(
+            run_folder=experiment_folderpath / "run" / group["name"],
+            application_name=application_name,
+            device_name=gpu_name,
+            group_name=group["name"],
+            group_display_name=group["display_name"],
+            stochastic=group["stochastic"],
+            objective_time_keys=objective_time_keys,
+            objective_performance_keys=objective_performance_keys,
+            minimization=minimization,
+        )
 
-                # setup the results description
-                if "options" not in strategy:
-                    strategy["options"] = dict()
+        # if the strategy is in the cache, use cached data
+        if ("ignore_cache" not in group or group["ignore_cache"] is False) and results_description.has_results():
+            print(" | - | - | -> retrieved from cache")
+        else:  # execute each strategy that is not in the cache
+            results_description = collect_results(
+                group["input_file"],
+                group,
+                results_description,
+                searchspace_statistics[group["gpu"]][group["application_name"]],
+                profiling=profiling,
+            )
 
-                # set when to stop
-                if cutoff_type == "time":
-                    strategy["options"]["time_limit"] = cutoff_point_time * cutoff_margin
-                else:
-                    strategy["options"]["max_fevals"] = min(
-                        int(ceil(cutoff_point_fevals * cutoff_margin)), searchspace_stats.size
-                    )
-                results_description = ResultsDescription(
-                    experiment_folder_id,
-                    kernel_name,
-                    gpu_name,
-                    strategy_name,
-                    strategy_display_name,
-                    stochastic,
-                    objective_time_keys=objective_time_keys,
-                    objective_performance_keys=objective_performance_keys,
-                    minimization=minimization,
-                    visualization_caches_path=experiment_folderpath / experiment["visualization_caches_path"],
-                )
+        # set the results
+        results_descriptions[group["gpu"]][group["application_name"]][group["name"]] = results_description
 
-                # if the strategy is in the cache, use cached data
-                if "ignore_cache" not in strategy and results_description.has_results():
-                    print(" | - |-> retrieved from cache")
-                else:  # execute each strategy that is not in the cache
-                    results_description = collect_results(
-                        kernel, strategy, results_description, searchspace_stats, profiling=profiling
-                    )
-
-                # set the results
-                results_descriptions[gpu_name][kernel_name][strategy_name] = results_description
-
-    return experiment, strategies, results_descriptions
+    return experiment, all_experimental_groups, searchspace_statistics, results_descriptions
 
 
 def entry_point():  #  pragma: no cover

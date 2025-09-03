@@ -1,0 +1,518 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/experiments/v0.1.1.schema.json",
+    "version": "1.2.0",
+    "title": "Experiment",
+    "description": "An experiment setup configuration file",
+    "type": "object",
+    "required": [
+        "name",
+        "parent_folder",
+        "experimental_groups_defaults",
+        "search_strategies",
+        "statistics_settings",
+        "visualization_settings"
+    ],
+    "properties": {
+        "version": {
+            "description": "Version number of the experiment setup configuration file standard",
+            "type": "string"
+        },
+        "name": {
+            "description": "Name of the experiment",
+            "type": "string"
+        },
+        "parent folder": {
+            "description": "Absolute or relative path of the folder to store all related files for this experiment. This folder needs to already exist.",
+            "type": "string",
+            "default": "./"
+        },
+        "experimental_groups_defaults": {
+            "description": "Default settings for experimental groups",
+            "type": "object",
+            "required": [
+                "applications",
+                "gpus"
+            ],
+            "properties": {
+                "autotuner": {
+                    "description": "Autotuner that will be used to tune the experimental group. Has to be specified either in experimental_groups_defaults or in experimental group.",
+                    "enum": [
+                        "KernelTuner",
+                        "KTT"
+                    ]
+                },
+                "autotuner_path": {
+                    "description": "Path to the library of the autotuner",
+                    "type": "string"
+                },
+                "applications": {
+                    "description": "List of applications for which measurements were taken and written to full search space files. Can be used in pattern_for_full_search_space_filename.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "input_file"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "input_file": {
+                                "type": "string"
+                            },
+                            "minimization": {
+                                "description": "Whether the optimization objective is to minimize (maximize if false).",
+                                "type": "boolean",
+                                "default": true
+                            },
+                            "objective_performance_keys": {
+                                "description": "The performance key(s) to use as the performance objective. In case of multiple keys, the values are summed.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "uniqueItems": true,
+                                "minItems": 1
+                            }
+                        }
+                    }
+                },
+                "gpus": {
+                    "description": "List of GPUs where measurements were taken and written to full search space files. Can be used in pattern_for_full_search_space_filename.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "pattern_for_full_search_space_filenames": {
+                    "description": "Pattern for filenames of full search space files",
+                    "type": "object",
+                    "required": [
+                        "regex"
+                    ],
+                    "properties": {
+                        "regex": {
+                            "type": "string",
+                            "pattern": ".*.json",
+                            "examples": [
+                                "${gpus}_${applications}_output.json",
+                                "full-search-space-${applications}-${gpus}.json"
+                            ]
+                        },
+                        "regex_variables": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": [
+                                "applications",
+                                "gpus"
+                            ]
+                        }
+                    }
+                },
+                "stochastic": {
+                    "description": "Whether the repeated runs of the same experimental group (combination of application, GPU and search strategy) exhibit stochastic behaviour, e.g. due to stochastic search strategy",
+                    "type": "boolean",
+                    "default": true
+                },
+                "repeats": {
+                    "description": "How many times to repeat the run for a single experimental group (combination of application, GPU and search strategy)",
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 100
+                },
+                "samples": {
+                    "description": "How many samples of measurements for a single configuration are present in full search space file",
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 32
+                },
+                "minimum_fraction_of_budget_valid": {
+                    "description": "The fraction of the total searchspace size that must be non-error, valid configurations for each single run of search algorithm",
+                    "type": "number",
+                    "exclusiveMinimum": 0.0,
+                    "maximum": 1.0,
+                    "default": 0.5
+                },
+                "minimum_number_of_valid_search_iterations": {
+                    "description": "How many non-error, valid configurations account for a single run of search algorithm",
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 10
+                },
+                "ignore_cache": {
+                    "description": "If true, always re-run the experiments, even though results from previously executed experiments are stored in run folder.",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "search_strategies": {
+            "description": "Settings for search strategies",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "search_method",
+                    "display_name"
+                ],
+                "properties": {
+                    "name": {
+                        "description": "Name of the search strategy",
+                        "type": "string"
+                    },
+                    "autotuner": {
+                        "description": "Autotuner that will be used for tuning. Has to be specified either in experimental_groups_defaults or in search_strategies.",
+                        "enum": [
+                            "KernelTuner",
+                            "KTT"
+                        ]
+                    },
+                    "autotuner_path": {
+                        "description": "Path to the library of the autotuner",
+                        "type": "string"
+                    },
+                    "custom_search_method_path": {
+                        "description": "Optional path to a custom search method implementation.",
+                        "type": "string"
+                    },
+                    "search_method": {
+                        "description": "Name of the search method as recognized by the autotuner, Class name if custom search method",
+                        "type": "string"
+                    },
+                    "search_method_hyperparameters": {
+                        "description": "A list of hyperparameters for the search method as recognized by the autotuner",
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": [
+                                        "number",
+                                        "string",
+                                        "boolean",
+                                        "object",
+                                        "array"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "display_name": {
+                        "description": "Name for the search strategy used in visualizations",
+                        "type": "string"
+                    },
+                    "color_parent": {
+                        "description": "Name of the parent search strategy to use a shade of its color for this search strategy.",
+                        "type": "string"
+                    },
+                    "color_index": {
+                        "description": "Override of the index of the color in the matplotlib colormap to use for this search strategy. Only use on strategy parents. If set, all strategy parents must have it.",
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "stochastic": {
+                        "description": "Whether the repeated runs of the same experimental group (combination of application, GPU and search strategy) exhibit stochastic behaviour, e.g. due to stochastic search strategy",
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "repeats": {
+                        "description": "How many times to repeat the run for a single experimental group (combination of application, GPU and search strategy)",
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 100
+                    },
+                    "samples": {
+                        "description": "How many samples of measurements for a single configuration are present in full search space file",
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 32
+                    },
+                    "minimum_number_of_valid_search_iterations": {
+                        "description": "How many non-error, valid configurations account for a single run of search strategy",
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 20
+                    },
+                    "ignore_cache": {
+                        "description": "If true, always re-run the experiments, even though results from previously executed experiments are stored in run folder.",
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
+            }
+        },
+        "statistics_settings": {
+            "description": "Settings for the statistics calculation",
+            "type": "object",
+            "required": [
+                "cutoff_percentile",
+                "cutoff_percentile_start",
+                "cutoff_type",
+                "objective_time_keys"
+            ],
+            "properties": {
+                "cutoff_percentile": {
+                    "description": "Fraction of difference between median and absolute optimum at which to stop the time range",
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                },
+                "cutoff_percentile_start": {
+                    "description": "Fraction of difference between median and absolute optimum at which to start the time range",
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMaximum": 1
+                },
+                "cutoff_type": {
+                    "description": "Whether to base the cutoff on function evaluations or time",
+                    "type": "string",
+                    "enum": [
+                        "fevals",
+                        "time"
+                    ]
+                },
+                "objective_time_keys": {
+                    "description": "Time key(s) to use as the time objective. In case of multiple keys, the values are summed.",
+                    "type": "array",
+                    "items": {
+                        "enum": [
+                            "compilation",
+                            "runtimes",
+                            "framework",
+                            "search_algorithm",
+                            "validation",
+                            "all"
+                        ]
+                    },
+                    "uniqueItems": true,
+                    "minItems": 1
+                }
+            }
+        },
+        "visualization_settings": {
+            "description": "Settings for the visualizations",
+            "type": "object",
+            "required": [
+                "plots",
+                "resolution",
+                "confidence_level"
+            ],
+            "properties": {
+                "plots": {
+                    "description": "Specification of the plots to produce.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "scope",
+                            "style"
+                        ],
+                        "properties": {
+                            "scope": {
+                                "description": "The scope of the plot: whether it's a plot per searchspace, per search strategy, or the aggregate.",
+                                "type": "string",
+                                "enum": [
+                                    "searchspace",
+                                    "search_strategy",
+                                    "aggregate"
+                                ]
+                            },
+                            "style": {
+                                "description": "The type of plot.",
+                                "type": "string",
+                                "enum": [
+                                    "line",
+                                    "scatter",
+                                    "heatmap",
+                                    "head2head"
+                                ]
+                            },
+                            "tmin": {
+                                "description": "The minimum value on the time axis of the aggregate plot.",
+                                "type": [
+                                    "number",
+                                    "string"
+                                ],
+                                "default": 1.0
+                            },
+                            "vmin": {
+                                "description": "The minimum value on the heatmap color scale or aggregate plot.",
+                                "type": [
+                                    "number",
+                                    "string"
+                                ],
+                                "default": -0.5
+                            },
+                            "vmax": {
+                                "description": "The maximum value on the heatmap color scale.",
+                                "type": "number",
+                                "default": 1.0
+                            },
+                            "cmin": {
+                                "description": "The minimum value shown in the heatmap colorbar. Must be vmin <= cmin < cmax <= vmax.",
+                                "type": "number",
+                                "default": -0.5
+                            },
+                            "cmax": {
+                                "description": "The maximum value shown in the heatmap colorbar. Must be vmin <= cmin < cmax <= vmax",
+                                "type": "number",
+                                "default": 1.0
+                            },
+                            "cnum": {
+                                "description": "The number of evenly placed ticks on the heatmap colorbar to display.",
+                                "type": "integer",
+                                "minimum": 2,
+                                "default": 5
+                            },
+                            "cap_to_vmin": {
+                                "description": "Whether to allow values below vmin to be capped at vmin in the heatmap (must be reported if applied).",
+                                "type": "boolean"
+                            },
+                            "comparison": {
+                                "description": "For head2head plots, the description of how to compare the search strategies.",
+                                "type": "object",
+                                "required": [
+                                    "relative_time",
+                                    "unit"
+                                ],
+                                "properties": {
+                                    "relative_time": {
+                                        "description": "The relative time at which to compare the search strategies.",
+                                        "type": "number",
+                                        "exclusiveMinimum": 0,
+                                        "inclusiveMaximum": 1
+                                    },
+                                    "unit": {
+                                        "description": "The unit of the value with which to compare the search strategies (difference in time or performance).",
+                                        "type": "string",
+                                        "enum": [
+                                            "objective",
+                                            "time"
+                                        ]
+                                    }
+                                }
+                            },
+                            "annotate": {
+                                "description": "Whether to annotate the heatmaps with the values in their cells.",
+                                "type": "boolean",
+                                "default": true
+                            },
+                            "include_y_labels": {
+                                "description": "Whether to show the y-axis labels on the heatmap. Displayed if not set.",
+                                "type": "boolean"
+                            },
+                            "include_colorbar": {
+                                "description": "Whether to show the heatmap colorbar. Displayed if not set.",
+                                "type": "boolean"
+                            },
+                            "bins": {
+                                "description": "The number of bins to use when plotting over a heatmap over a non-discrete range (e.g. time)",
+                                "type": "integer",
+                                "default": 10
+                            },
+                            "x_axis_value_types": {
+                                "description": "Types of value on the x-axis. Multiple values may produce multiple (sub) plots.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "fevals",
+                                        "time",
+                                        "applications",
+                                        "gpus",
+                                        "searchspaces"
+                                    ]
+                                },
+                                "minItems": 1,
+                                "uniqueItems": true
+                            },
+                            "y_axis_value_types": {
+                                "description": "Types of value on the y-axis. Multiple values may produce multiple (sub) plots.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "absolute",
+                                        "normalized",
+                                        "baseline",
+                                        "time",
+                                        "applications",
+                                        "gpus",
+                                        "searchspaces"
+                                    ]
+                                },
+                                "minItems": 1,
+                                "uniqueItems": true
+                            },
+                            "x_label": {
+                                "description": "Override the default generated label for the x-axis.",
+                                "type": "string"
+                            },
+                            "y_label": {
+                                "description": "Override the default generated label for the y-axis.",
+                                "type": "string"
+                            },
+                            "print_mean_of_columns": {
+                                "description": "Print the mean of the columns in the heatmap to the console.",
+                                "type": "boolean",
+                                "default": false
+                            },
+                            "print_mean_of_rows": {
+                                "description": "Print the mean of the rows in the heatmap to the console.",
+                                "type": "boolean",
+                                "default": false
+                            },
+                            "divide_train_test_axis": {
+                                "description": "Axis to divide the train and test data on in the heatmap.",
+                                "type": "string",
+                                "enum": [
+                                    "gpus",
+                                    "applications"
+                                ],
+                                "default": "gpus"
+                            },
+                            "divide_train_test_after_num": {
+                                "description": "Number of items in the divide_train_test_axis after which to divide the train and test data.",
+                                "type": "integer",
+                                "default": 3
+                            }
+                        }
+                    }
+                },
+                "resolution": {
+                    "description": "The resolution of the time range",
+                    "type": "integer",
+                    "default": 1000,
+                    "minimum": 2
+                },
+                "confidence_level": {
+                    "description": "The confidence level used for the confidence / prediction interval, visualized as an error shade",
+                    "type": "number",
+                    "default": 0.95,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                },
+                "compare_baselines": {
+                    "description": "[preview feature] Compare baselines to each other. Requires editing the baselines list in the `plot_baselines_comparison` function.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "compare_split_times": {
+                    "description": "[preview feature] Plot a comparison of split times for strategies and baselines",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        }
+    }
+}

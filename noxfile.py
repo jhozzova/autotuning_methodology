@@ -16,11 +16,13 @@ nox.options.error_on_missing_interpreters = True
 def lint(session: nox.Session) -> None:
     """Ensure the code is formatted as expected."""
     session.install("ruff")
-    session.run("ruff", "check", "--output-format=github", "--config=pyproject.toml", ".")
+    session.run("ruff", "check", "--output-format=github", "--config=pyproject.toml", "src")
 
 
 # @nox.session  # uncomment this line to only run on the current python interpreter
-@nox.session(python=["3.9", "3.10", "3.11", "3.12"])  # missing versions can be installed with `pyenv install ...`
+@nox.session(
+    python=["3.10", "3.11", "3.12", "3.13"]
+)  # missing versions can be installed with `pyenv install ...`
 # do not forget check / set the versions with `pyenv global`, or `pyenv local` in case of virtual environment
 def tests(session: nox.Session) -> None:
     """Run the tests for the specified Python versions."""

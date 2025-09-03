@@ -22,7 +22,7 @@ Currently, the stable releases of this software package are compatible with [Ker
 ## Installation
 The package can be installed with `pip install autotuning_methodology`. 
 Alternatively, it can be installed by cloning this repository and running `pip install .` in the root of the cloned project. 
-Python >= 3.9 is supported. 
+Like most Python packages, installing in a virtual environment or with `pipx` is recommended. Python >= 3.10 is supported. 
 
 ## Notable features
 - Official software by the authors of the methodology-defining paper. 

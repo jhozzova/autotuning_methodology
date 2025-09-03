@@ -2,12 +2,14 @@
 
 from __future__ import annotations  # for correct nested type hints e.g. list[str], tuple[dict, str]
 
-import json
 from math import ceil, floor
 from pathlib import Path
+from warnings import warn
 
+import matplotlib.pyplot as plt
 import numpy as np
 
+from autotuning_methodology.formats_interface import load_T4_format
 from autotuning_methodology.validators import is_invalid_objective_performance, is_invalid_objective_time
 
 
@@ -27,8 +29,118 @@ def nansumwrapper(array: np.ndarray, **kwargs) -> np.ndarray:
     return summed_array
 
 
+def convert_from_time_unit(value, from_unit: str):
+    """Convert the value or list of values from the specified time unit to seconds."""
+    if from_unit is None:
+        return None
+    elif isinstance(value, list):
+        return [convert_from_time_unit(v, from_unit) for v in value]
+    elif not isinstance(value, (int, float, complex)):
+        return value
+    unit = from_unit.lower()
+    if unit == "seconds" or unit == "s":
+        return value
+    elif unit == "milliseconds" or unit == "miliseconds" or unit == "ms":
+        return value / 1000
+    elif unit == "microseconds":
+        return value / 1000000
+    elif unit == "nanoseconds" or unit == "ns":
+        return value / 1000000000
+    else:
+        raise ValueError(f"Conversion unit {from_unit} is not supported")
+
+
+def is_not_invalid_value(value, performance: bool) -> bool:
+    """Checks if a performance or time value is an array or is not invalid."""
+    if isinstance(value, str):
+        return False
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return True
+    invalid_check_function = is_invalid_objective_performance if performance else is_invalid_objective_time
+    return not invalid_check_function(value)
+
+def filter_invalids(values, performance: bool) -> list:
+    """Filter out invalid values from the array.
+    
+    Assumes that `values` is a list or array of values.
+    If changes are made here, also change `is_invalid_objective_time`.
+    """
+    if performance or any([isinstance(v, (str, list, tuple, np.ndarray)) for v in values]):
+        # if there are any non-numeric values, fall back to a list comprehension
+        return list([v for v in values if is_not_invalid_value(v, performance)])
+    # invalid time values can be checked for the entire array at once, much faster than iterating
+    array = np.array(values)
+    return array[(~np.isnan(array)) & (array >= 0.0)].tolist()
+
+def to_valid_array(
+    results: list[dict],
+    key: str,
+    performance: bool,
+    from_time_unit: str = None,
+    replace_missing_measurement_from_times_key: str = None,
+) -> np.ndarray:
+    """Convert results performance or time values to a numpy array, sum if the input is a list of arrays.
+
+    replace_missing_measurement_from_times_key: if key is missing from measurements, use the mean value from times.
+    """
+    # make a list of all valid values
+    if performance:
+        values = list()
+        for r in results:
+            val = None
+            # get the performance value from the measurements
+            measurements = list(filter(lambda m: m["name"] == key, r["measurements"]))
+            if len(measurements) == 0:
+                if replace_missing_measurement_from_times_key is not None:
+                    val = np.mean(r["times"][replace_missing_measurement_from_times_key])
+                else:
+                    raise ValueError(f"Measurement with name {key} not found in {r['measurements']}")
+            if len(measurements) == 1:
+                m = measurements[0]
+                if key == m["name"]:
+                    val = m["value"]
+            elif len(measurements) > 1:
+                raise ValueError(f"Multiple measurements with the same name {key} found in results")
+            # register the value
+            if is_not_invalid_value(val, performance):
+                # performance should not be auto-converted
+                # if len(m["unit"]) > 0:
+                #     val = convert_from_time_unit(val, m["unit"])
+                values.append(val)
+            else:
+                values.append(np.nan)
+    else:
+        values = list(
+            (
+                convert_from_time_unit(v["times"][key], from_time_unit)
+                if key in v["times"] and is_not_invalid_value(v["times"][key], performance)
+                else np.nan
+            )
+            for v in results
+        )
+        # TODO other that time, performance such as power usage are in results["measurements"]. or not?
+    # check if there are values that are arrays
+    for value_index, value in enumerate(values):
+        if isinstance(value, (list, tuple, np.ndarray)):
+            # if the value is an array, sum the valid values
+            list_to_sum = filter_invalids(value, performance)
+            try:
+                sum_of_list = sum(list_to_sum)
+                values[value_index] = (
+                    sum_of_list
+                    if len(list_to_sum) > 0 and is_not_invalid_value(sum_of_list, performance)
+                    else np.nan
+                )
+            except TypeError as e:
+                raise TypeError(
+                    f"Invalid type for {key=}, {value=}, {list_to_sum=}, {values=}, {performance=}, {from_time_unit=} ({e})"
+                )
+    assert all(isinstance(v, (int, float)) for v in values)
+    return np.array(values)
+
+
 class SearchspaceStatistics:
-    """Object for obtaining information from a raw, brute-forced cache file."""
+    """Object for obtaining information from a full search space file."""
 
     size: int
     repeats: int
@@ -44,7 +156,7 @@ class SearchspaceStatistics:
 
     T4_time_keys_to_kernel_tuner_time_keys_mapping = {
         "compilation": "compile_time",
-        "benchmark": "benchmark_time",
+        "runtimes": "benchmark_time",
         "framework": "framework_time",
         "search_algorithm": "strategy_time",
         "validation": "verification_time",
@@ -55,33 +167,35 @@ class SearchspaceStatistics:
 
     def __init__(
         self,
-        kernel_name: str,
+        application_name: str,
         device_name: str,
         minimization: bool,
         objective_time_keys: list[str],
         objective_performance_keys: list[str],
-        bruteforced_caches_path=Path("cached_data_used/cachefiles"),
+        full_search_space_file_path: str,
+        full_validate: bool = True,
     ) -> None:
         """Initialization method for a Searchspace statistics object.
 
         Args:
-            kernel_name: the name of the kernel.
+            application_name: the name of the kernel.
             device_name: the name of the device (GPU) used.
             minimization: whether the optimization algorithm was minimizing.
             objective_time_keys: the objective time keys used.
             objective_performance_keys: the objective performance keys used.
-            bruteforced_caches_path: the path to the bruteforced caches.
+            full_search_space_file_path: the path to the full search space file.
+            full_validate: whether to fully validate the searchspace statistics file on load. Defaults to True.
         """
         self.loaded = False
-        self.kernel_name = kernel_name
+        self.application_name = application_name
         self.device_name = device_name
         self.minimization = minimization
-        self.objective_time_keys = self.T4_time_keys_to_kernel_tuner_time_keys(objective_time_keys)
+        self.objective_time_keys = objective_time_keys
         self.objective_performance_keys = objective_performance_keys
-        self.bruteforced_caches_path = bruteforced_caches_path
+        self.full_search_space_file_path = full_search_space_file_path
 
         # load the data into the arrays
-        self.loaded = self._load()
+        self.loaded = self._load(validate=full_validate)
 
     def T4_time_keys_to_kernel_tuner_time_keys(self, time_keys: list[str]) -> list[str]:
         """Temporary utility function to use the kernel tuner search space files with the T4 output format.
@@ -131,9 +245,8 @@ class SearchspaceStatistics:
             cutoff_percentile: the desired cutoff percentile to reach before stopping.
         """
         # prepare plot
-        import matplotlib.pyplot as plt
 
-        fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
+        _, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
         if not isinstance(axs, list):
             axs = [axs]
 
@@ -147,7 +260,7 @@ class SearchspaceStatistics:
         n_bins = 200
         axs[0].hist(performances, bins=n_bins)
         axs[0].set_ylabel("Number of configurations in bin")
-        axs[0].set_xlabel("Performance in miliseconds")
+        axs[0].set_xlabel("Performance in milliseconds")
         axs[0].axvline(x=[mean], label="Mean", c="red")
         axs[0].axvline(x=[median], label="Median", c="orange")
         axs[0].axvline(x=[cutoff_performance], label="Cutoff point", c="green")
@@ -165,7 +278,11 @@ class SearchspaceStatistics:
         Returns:
             A tuple of the objective value at the cutoff point and the fevals to the cutoff point.
         """
-        inverted_sorted_performance_arr = self.objective_performances_total_sorted[::-1]
+        inverted_sorted_performance_arr = (
+            self.objective_performances_total_sorted[::-1]
+            if self.minimization
+            else self.objective_performances_total_sorted
+        )
         N = inverted_sorted_performance_arr.shape[0]
 
         # get the objective performance at the cutoff point
@@ -194,9 +311,27 @@ class SearchspaceStatistics:
 
         # iterate over the inverted_sorted_performance_arr until we have
         # i = next(x[0] for x in enumerate(inverted_sorted_performance_arr) if x[1] > cutoff_percentile * arr[-1])
-        i = next(
-            x[0] for x in enumerate(inverted_sorted_performance_arr) if x[1] <= objective_performance_at_cutoff_point
-        )
+        if self.minimization:
+            i = next(
+                x[0]
+                for x in enumerate(inverted_sorted_performance_arr)
+                if x[1] <= objective_performance_at_cutoff_point
+            )
+        else:
+            i = next(
+                x[0]
+                for x in enumerate(inverted_sorted_performance_arr)
+                if x[1] >= objective_performance_at_cutoff_point
+            )
+        if cutoff_percentile != 1.0 and inverted_sorted_performance_arr[i] == self.total_performance_absolute_optimum():
+            if i == 0:
+                raise ValueError(
+                    f"The optimum is directly reached ({inverted_sorted_performance_arr[i]})",
+                    inverted_sorted_performance_arr,
+                )
+            else:
+                i = i - 1
+                warn(f"Scaled down cutoff point as {cutoff_percentile} is equal to optimum (1.0) for this distribution")
         # In case of x <= (1+p) * f_opt
         # i = next(x[0] for x in enumerate(inverted_sorted_performance_arr) if x[1] <= (1 + (1 - cutoff_percentile)) * arr[-1])  # noqa: E501
         # In case of p*x <= f_opt
@@ -206,6 +341,17 @@ class SearchspaceStatistics:
         # print(f"{fevals_to_cutoff_point=} ({i=})")
         # exit(0)
         return objective_performance_at_cutoff_point, fevals_to_cutoff_point
+
+    def cutoff_point_time_from_fevals(self, cutoff_point_fevals: int) -> float:
+        """Calculates the time to the cutoff point from the number of function evaluations.
+
+        Args:
+            cutoff_point_fevals: the number of function evaluations to reach the cutoff point.
+
+        Returns:
+            The time to the cutoff point.
+        """
+        return cutoff_point_fevals * self.total_time_median()
 
     def cutoff_point_fevals_time(self, cutoff_percentile: float) -> tuple[float, int, float]:
         """Calculates the cutoff point.
@@ -217,18 +363,43 @@ class SearchspaceStatistics:
             A tuple of the objective value at cutoff point, fevals to cutoff point, and the mean time to cutoff point.
         """
         cutoff_point_value, cutoff_point_fevals = self.cutoff_point(cutoff_percentile)
-        cutoff_point_time = cutoff_point_fevals * self.total_time_median()
+        cutoff_point_time = self.cutoff_point_time_from_fevals(cutoff_point_fevals)
         return cutoff_point_value, cutoff_point_fevals, cutoff_point_time
 
-    def _get_filepath(self, lowercase=True) -> Path:
-        """Returns the filepath."""
-        kernel_directory = self.kernel_name
-        if lowercase:
-            kernel_directory = kernel_directory.lower()
-        filename = f"{self.device_name}.json"
-        if lowercase:
-            filename = filename.lower()
-        return self.bruteforced_caches_path / kernel_directory / filename
+    def cutoff_point_fevals_time_start_end(
+        self, cutoff_percentile_start: float, cutoff_percentile: float
+    ) -> tuple[int, int, float, float]:
+        """Calculates the cutoff point for both the start and end, and ensures there is enough margin between the two.
+
+        Args:
+            cutoff_percentile_start: the desired cutoff percentile to reach before starting the plot.
+            cutoff_percentile: the desired cutoff percentile to reach before stopping.
+
+        Returns:
+            A tuple of the fevals to cutoff point start and end, and the mean time to cutoff point start and end.
+        """
+        # get the cutoff points
+        _, cutoff_point_fevals_start = self.cutoff_point(cutoff_percentile_start)
+        _, cutoff_point_fevals_end = self.cutoff_point(cutoff_percentile)
+
+        # apply a safe margin if needed
+        if cutoff_point_fevals_end - cutoff_point_fevals_start < 2:
+            if cutoff_point_fevals_start == 0:
+                cutoff_point_fevals_end = min(self.cutoff_point(1.0)[0], cutoff_point_fevals_end + 2)
+            else:
+                cutoff_point_fevals_end = min(self.cutoff_point(1.0)[0], cutoff_point_fevals_end + 1)
+                cutoff_point_fevals_start -= 1
+        if cutoff_point_fevals_end - cutoff_point_fevals_start == 0:
+            raise ValueError("Cutoff point start and end are the same")
+
+        # get the times
+        cutoff_point_time_start = self.cutoff_point_time_from_fevals(
+            cutoff_point_fevals_start if cutoff_percentile_start > 0.0 else 0
+        )
+        cutoff_point_time_end = self.cutoff_point_time_from_fevals(cutoff_point_fevals_end)
+
+        # return the values
+        return cutoff_point_fevals_start, cutoff_point_fevals_end, cutoff_point_time_start, cutoff_point_time_end
 
     def get_valid_filepath(self) -> Path:
         """Returns the filepath to the Searchspace statistics .json file if it exists.
@@ -239,9 +410,9 @@ class SearchspaceStatistics:
         Returns:
             Filepath to the Searchspace statistics .json file.
         """
-        filepath = self._get_filepath()
+        filepath = self.full_search_space_file_path
         if not filepath.exists():
-            filepath = self._get_filepath(lowercase=False)
+            filepath = Path(str(self.full_search_space_file_path) + ".json")
         if not filepath.exists():
             # if the file is not found, raise an error
             from os import getcwd
@@ -251,147 +422,101 @@ class SearchspaceStatistics:
             )
         return filepath
 
-    def _is_not_invalid_value(self, value, performance: bool) -> bool:
-        """Checks if a cache performance or time value is an array or is not invalid."""
-        if isinstance(value, str):
-            return False
-        if isinstance(value, (list, tuple, np.ndarray)):
-            return True
-        invalid_check_function = is_invalid_objective_performance if performance else is_invalid_objective_time
-        return not invalid_check_function(value)
-
-    def _to_valid_array(self, cache_values: list[dict], key: str, performance: bool) -> np.ndarray:
-        """Convert valid cache performance or time values to a numpy array, sum if the input is a list of arrays."""
-        # make a list of all valid values
-        values = list(
-            v[key] if key in v and self._is_not_invalid_value(v[key], performance) else np.nan for v in cache_values
-        )
-        # check if there are values that are arrays
-        for value_index, value in enumerate(values):
-            if isinstance(value, (list, tuple, np.ndarray)):
-                # if the cache value is an array, sum the valid values
-                array = value
-                list_to_sum = list(v for v in array if self._is_not_invalid_value(v, performance))
-                values[value_index] = (
-                    sum(list_to_sum)
-                    if len(list_to_sum) > 0 and self._is_not_invalid_value(sum(list_to_sum), performance)
-                    else np.nan
-                )
-        assert all(isinstance(v, (int, float)) for v in values)
-        return np.array(values)
-
-    def _load(self) -> bool:
-        """Load the contents of the cache file."""
+    def _load(self, validate=True) -> bool:
+        """Load the contents of the full search space file."""
+        # if not, use a script to create a file with values from KTT output and formatting of KernelTuner
         filepath = self.get_valid_filepath()
-        with open(filepath, "r", encoding="utf-8") as fh:
-            print(f"Loading statistics for {filepath}...")
-            # get the cache from the .json file
-            orig_contents = fh.read()
-            try:
-                data = json.loads(orig_contents)
-            except json.decoder.JSONDecodeError:
-                contents = orig_contents[:-1] + "}\n}"
-                try:
-                    data = json.loads(contents)
-                except json.decoder.JSONDecodeError:
-                    contents = orig_contents[:-2] + "}\n}"
-                    data = json.loads(contents)
-            cache: dict = data["cache"]
-            self.cache = cache
+        data = load_T4_format(filepath, validate=validate)
+        metadata: dict = data.get("metadata", {})
+        timeunit = metadata.get("timeunit", "seconds")
+        results: dict = data["results"]
+        self.results = results
 
-            # get the time values per configuration
-            cache_values = list(cache.values())
-            self.size = len(cache_values)
-            self.objective_times = dict()
-            for key in self.objective_time_keys:
-                self.objective_times[key] = self._to_valid_array(cache_values, key, performance=False)
-                self.objective_times[key] = (
-                    self.objective_times[key] / 1000
-                )  # TODO Kernel Tuner specific miliseconds to seconds conversion
-                assert (
-                    self.objective_times[key].ndim == 1
-                ), f"Should have one dimension, has {self.objective_times[key].ndim}"
-                assert self.objective_times[key].shape[0] == len(
-                    cache_values
-                ), f"Should have the same size as cache_values ({self.size}), has {self.objective_times[key].shape[0]}"
-                assert not np.all(
-                    np.isnan(self.objective_times[key])
-                ), f"""All values for {key=} are NaN.
-                        Likely the experiment did not collect time values for objective_time_keys '{key}'."""
-
-            # get the performance values per configuration
-            self.objective_performances = dict()
-            for key in self.objective_performance_keys:
-                self.objective_performances[key] = self._to_valid_array(cache_values, key, performance=True)
-                assert (
-                    self.objective_performances[key].ndim == 1
-                ), f"Should have one dimension, has {self.objective_performances[key].ndim}"
-                assert self.objective_performances[key].shape[0] == len(
-                    cache_values
-                ), f"""Should have the same size as cache_values ({self.size}),
-                        has {self.objective_performances[key].shape[0]}"""
-                assert not np.all(
-                    np.isnan(self.objective_performances[key])
-                ), f"""All values for {key=} are NaN.
-                    Likely the experiment did not collect performance values for objective_performance_key '{key}'."""
-
-            # get the number of repeats
-            valid_cache_index: int = 0
-            while "times" not in cache_values[valid_cache_index]:
-                valid_cache_index += 1
-            self.repeats = len(cache_values[valid_cache_index]["times"])
-
-            # combine the arrays to the shape [len(objective_keys), self.size]
-            self.objective_times_array = np.array(list(self.objective_times[key] for key in self.objective_time_keys))
-            assert self.objective_times_array.shape == tuple([len(self.objective_time_keys), self.size])
-            self.objective_performances_array = np.array(
-                list(self.objective_performances[key] for key in self.objective_performance_keys)
+        # get the time values per configuration
+        self.size = len(data["results"])
+        self.objective_times = dict()
+        for key in self.objective_time_keys:
+            self.objective_times[key] = to_valid_array(results, key, performance=False, from_time_unit=timeunit)
+            assert self.objective_times[key].ndim == 1, (
+                f"Should have one dimension, has {self.objective_times[key].ndim}"
             )
-            assert self.objective_performances_array.shape == tuple([len(self.objective_performance_keys), self.size])
+            assert self.objective_times[key].shape[0] == self.size, (
+                f"Should have the same size as results ({self.size}), has {self.objective_times[key].shape[0]}"
+            )
+            assert not np.all(np.isnan(self.objective_times[key])), f"""All values for {key=} are NaN.
+                    Likely the experiment did not collect time values for objective_time_keys '{key}'."""
 
-            # get the totals
-            self.objective_times_total = nansumwrapper(self.objective_times_array, axis=0)
-            assert self.objective_times_total.shape == tuple([self.size])
-            # more of a test than a necessary assert
+        # get the performance values per configuration
+        self.objective_performances = dict()
+        for key in self.objective_performance_keys:
+            self.objective_performances[key] = to_valid_array(
+                results,
+                key,
+                performance=True,
+                replace_missing_measurement_from_times_key="runtimes" if key == "time" else None,
+            )
+            assert self.objective_performances[key].ndim == 1, (
+                f"Should have one dimension, has {self.objective_performances[key].ndim}"
+            )
             assert (
-                np.nansum(self.objective_times_array[:, 0]) == self.objective_times_total[0]
-            ), f"""Sums of objective performances do not match:
-                {np.nansum(self.objective_times_array[:, 0])} vs. {self.objective_times_total[0]}"""
-            self.objective_performances_total = nansumwrapper(self.objective_performances_array, axis=0)
-            assert self.objective_performances_total.shape == tuple([self.size])
-            # more of a test than a necessary assert
-            assert (
-                np.nansum(self.objective_performances_array[:, 0]) == self.objective_performances_total[0]
-            ), f"""Sums of objective performances do not match:
-                {np.nansum(self.objective_performances_array[:, 0])} vs. {self.objective_performances_total[0]}"""
+                self.objective_performances[key].shape[0] == self.size
+            ), f"""Should have the same size as results ({self.size}),
+                    has {self.objective_performances[key].shape[0]}"""
+            assert not np.all(np.isnan(self.objective_performances[key])), f"""All values for {key=} are NaN.
+                Likely the experiment did not collect performance values for objective_performance_key '{key}'."""
 
-            # sort
-            self.objective_times_total_sorted = np.sort(
-                self.objective_times_total[~np.isnan(self.objective_times_total)]
-            )
-            self.objective_times_number_of_nan = (
-                self.objective_times_total.shape[0] - self.objective_times_total_sorted.shape[0]
-            )
-            objective_performances_nan_mask = np.isnan(self.objective_performances_total)
-            self.objective_performances_number_of_nan = np.count_nonzero(objective_performances_nan_mask)
-            self.objective_performances_total_sorted = np.sort(
-                self.objective_performances_total[~objective_performances_nan_mask]
-            )
-            # make sure the best values are at the start, because NaNs are appended to the end
-            sorted_best_first = (
-                self.objective_performances_total_sorted
-                if self.minimization
-                else self.objective_performances_total_sorted[::-1]
-            )
-            self.objective_performances_total_sorted_nan = np.concatenate(
-                (sorted_best_first, [np.nan] * self.objective_performances_number_of_nan)
-            )
+        # get the number of repeats
+        # TODO is this necessary? number of repeats is given in experiments setup file
+        # valid_cache_index: int = 0
+        # while "times" not in cache_values[valid_cache_index]:
+        #    valid_cache_index += 1
+        # self.repeats = len(cache_values[valid_cache_index]["times"])
+
+        # combine the arrays to the shape [len(objective_keys), self.size]
+        self.objective_times_array = np.array(list(self.objective_times[key] for key in self.objective_time_keys))
+        assert self.objective_times_array.shape == tuple([len(self.objective_time_keys), self.size])
+        self.objective_performances_array = np.array(
+            list(self.objective_performances[key] for key in self.objective_performance_keys)
+        )
+        assert self.objective_performances_array.shape == tuple([len(self.objective_performance_keys), self.size])
+
+        # get the totals
+        self.objective_times_total = nansumwrapper(self.objective_times_array, axis=0)
+        assert self.objective_times_total.shape == tuple([self.size])
+        # more of a test than a necessary assert
+        assert (
+            np.nansum(self.objective_times_array[:, 0]) == self.objective_times_total[0]
+        ), f"""Sums of objective performances do not match:
+            {np.nansum(self.objective_times_array[:, 0])} vs. {self.objective_times_total[0]}"""
+        self.objective_performances_total = nansumwrapper(self.objective_performances_array, axis=0)
+        assert self.objective_performances_total.shape == tuple([self.size])
+        # more of a test than a necessary assert
+        assert (
+            np.nansum(self.objective_performances_array[:, 0]) == self.objective_performances_total[0]
+        ), f"""Sums of objective performances do not match:
+            {np.nansum(self.objective_performances_array[:, 0])} vs. {self.objective_performances_total[0]}"""
+
+        # sort
+        self.objective_times_total_sorted = np.sort(self.objective_times_total[~np.isnan(self.objective_times_total)])
+        self.objective_times_number_of_nan = (
+            self.objective_times_total.shape[0] - self.objective_times_total_sorted.shape[0]
+        )
+        objective_performances_nan_mask = np.isnan(self.objective_performances_total)
+        self.objective_performances_number_of_nan = np.count_nonzero(objective_performances_nan_mask)
+        self.objective_performances_total_sorted = np.sort(
+            self.objective_performances_total[~objective_performances_nan_mask]
+        )
+        # make sure the best values are at the start, because NaNs are appended to the end
+        sorted_best_first = (
+            self.objective_performances_total_sorted
+            if self.minimization
+            else self.objective_performances_total_sorted[::-1]
+        )
+        self.objective_performances_total_sorted_nan = np.concatenate(
+            (sorted_best_first, [np.nan] * self.objective_performances_number_of_nan)
+        )
 
         return True
-
-    def get_value_in_config(self, config: str, key: str):
-        """Get the value for a key given a configuration."""
-        return self.cache[config][key]
 
     def get_num_duplicate_values(self, value: float) -> int:
         """Get the number of duplicate values in the searchspace."""
@@ -402,7 +527,7 @@ class SearchspaceStatistics:
 
     def mean_strategy_time_per_feval(self) -> float:
         """Gets the average time spent on the strategy per function evaluation."""
-        if "strategy" in self.objective_times:
+        if "search_algorithm" in self.objective_times:
             strategy_times = self.objective_times
             invalid_mask = np.isnan(self.objective_performances_total)
             if not all(invalid_mask):

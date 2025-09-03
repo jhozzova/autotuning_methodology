@@ -30,44 +30,41 @@ class ResultsDescription:
 
     def __init__(
         self,
-        folder_id: str,
-        kernel_name: str,
+        run_folder: Path,
+        application_name: str,
         device_name: str,
-        strategy_name: str,
-        strategy_display_name: str,
+        group_name: str,
+        group_display_name: str,
         stochastic: bool,
         objective_time_keys: list[str],
         objective_performance_keys: list[str],
         minimization: bool,
-        visualization_caches_path: Path,
     ) -> None:
         """Initialization method for the ResultsDescription object.
 
         Args:
-            folder_id: the unique ID of the folder to store in.
-            kernel_name: the name of the kernel used.
+            run_folder: a folder to store all files generated during experiments
+            application_name: the name of the application.
             device_name: the name of the device used.
-            strategy_name: the name of the optimization algorithm used, must not contain spaces or special characters.
-            strategy_display_name: the name of the optimization algorithm used in printing / visualization.
-            stochastic: whether the optimization algorithm is stochastic.
+            group_name: the name of the experimental group, usually search method used, must not contain spaces or special characters.
+            group_display_name: the name of the experimental group used in printing / visualization.
+            stochastic: whether the search method is stochastic.
             objective_time_keys: the objective time keys used.
             objective_performance_keys: the objective performance keys used.
-            minimization: whether the optimization algorithm performed minimization (attempted to find the minimum).
-            visualization_caches_path: path to visualization caches relative to the experiments file, creation allowed.
+            minimization: whether the search method performed minimization (attempted to find the minimum).
         """
         # all attributes must be hashable for symetric difference checking
         self._version = "1.3.0"
         self.__stored = False
-        self.__folder_id = folder_id
-        self.kernel_name = kernel_name
+        self.application_name = application_name
         self.device_name = device_name
-        self.strategy_name = strategy_name
-        self.strategy_display_name = strategy_display_name
+        self.group_name = group_name
+        self.group_display_name = group_display_name
         self.stochastic = stochastic
         self.objective_time_keys = objective_time_keys
         self.objective_performance_keys = objective_performance_keys
         self.minimization = minimization
-        self.visualization_caches_path = visualization_caches_path
+        self.run_folder = run_folder
         self.numpy_arrays_keys = [
             "fevals_results",
             "objective_time_results",
@@ -85,7 +82,7 @@ class ResultsDescription:
             a dictionary, similar to self.__dict__ but with some keys removed.
         """
         dictionary = vars(self)
-        not_saved_keys = ["strategy_display_name", "visualization_caches_path"]
+        not_saved_keys = ["group_display_name", "visualization_caches_path"]
         for not_saved_key in not_saved_keys:
             if not_saved_key in dictionary.keys():
                 del dictionary[not_saved_key]
@@ -124,21 +121,25 @@ class ResultsDescription:
 
         # check if same value for each key
         for attribute_key, attribute_value in self.__get_as_dict().items():
-            if attribute_key == "strategy_display_name" or attribute_key == "visualization_caches_path":
+            if (
+                attribute_key == "group_display_name"
+                or attribute_key == "visualization_caches_path"
+                or attribute_key == "run_folder"
+            ):
                 continue
             else:
-                assert (
-                    attribute_value == other.__get_as_dict()[attribute_key]
-                ), f"{attribute_key} has different values: {attribute_value} != {other.__get_as_dict()[attribute_key]}"
+                assert attribute_value == other.__get_as_dict()[attribute_key], (
+                    f"{attribute_key} has different values: {attribute_value} != {other.__get_as_dict()[attribute_key]}"
+                )
 
         return True
 
     def __get_cache_filename(self) -> str:
-        return f"{self.device_name}_{self.strategy_name}.npz"
+        return f"{self.device_name}_{self.application_name}.npz"
 
     def __get_cache_filepath(self) -> Path:
         """Get the filepath to this experiment."""
-        return self.visualization_caches_path / self.__folder_id / self.kernel_name
+        return self.run_folder
 
     def __get_cache_full_filepath(self) -> Path:
         """Get the filepath for this file, including the filename and extension."""
@@ -147,7 +148,7 @@ class ResultsDescription:
     def __check_for_file(self) -> bool:
         """Check whether the file exists."""
         full_filepath = self.__get_cache_full_filepath()
-        self.__stored = full_filepath.exists() and np.DataSource().exists(full_filepath)
+        self.__stored = full_filepath.exists() and np.lib.npyio.DataSource().exists(full_filepath)
         return self.__stored
 
     def __write_to_file(self, arrays: dict):
@@ -172,14 +173,22 @@ class ResultsDescription:
             raise ValueError(f"File {full_filepath} does not exist")
 
         # load the data and verify the resultsdescription object is the same
-        data = np.load(full_filepath, allow_pickle=True)
+        try:
+            data = np.load(full_filepath, allow_pickle=True)
+        except Exception as e:
+            print(f"/!\\ Error loading file: {full_filepath} /!\\")
+            raise e
         data_results_description = data["resultsdescription"].item()
         assert self.is_same_as(data_results_description), "The results description of the results is not the same"
 
         # get the numpy arrays
         numpy_arrays = list()
         for numpy_array_key in self.numpy_arrays_keys:
-            numpy_arrays.append(data[numpy_array_key])
+            try:
+                numpy_arrays.append(data[numpy_array_key])
+            except Exception as e:
+                print(f"/!\\ Error adding numpy array {numpy_array_key} from file: {full_filepath} /!\\")
+                raise e
         return numpy_arrays
 
     def get_results(self) -> Results:
@@ -190,3 +199,11 @@ class ResultsDescription:
     def has_results(self) -> bool:
         """Checks whether there are results or the file exists."""
         return self.__stored or self.__check_for_file()
+
+    def delete(self) -> bool:
+        """Deletes the file if it exists, returns true if succesfully deleted."""
+        fp = self.__get_cache_full_filepath()
+        if fp.exists() and fp.is_file():
+            fp.unlink()
+            return True
+        return False
