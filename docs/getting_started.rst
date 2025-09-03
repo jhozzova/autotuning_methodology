@@ -3,7 +3,7 @@ Getting Started
 
 Start out by installing the package. 
 The simplest way to do this is ``pip install autotuning_methodology``. 
-Python 3.9 and up are supported. 
+Python 3.10 and up are supported. 
 
 Defining an experiment
 ^^^^^^^^^^^^^^^^^^^^^^
