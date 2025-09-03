@@ -8,7 +8,10 @@ import os
 import time as python_time
 import warnings
 from pathlib import Path
-import pickle, gzip             # compression libraries if necessary for collecting results
+
+# compression libraries if necessary for collecting results
+import pickle
+import gzip
 
 import numpy as np
 import progressbar
@@ -227,13 +230,15 @@ def collect_results(
         results_description: the ``ResultsDescription`` object to write the results to.
         searchspace_stats: the ``SearchspaceStatistics`` object, used for conversion of imported runs.
         profiling: whether profiling statistics must be collected.
+        compress: whether the results should be compressed.
 
     Returns:
         The ``ResultsDescription`` object with the results.
     """
     if profiling:
-        import psutil, os
-        process = psutil.Process(os.getpid())
+        import psutil
+        from os import getpid
+        process = psutil.Process(getpid())
         warnings.warn(f"Memory usage at start of collect_results: {process.memory_info().rss / 1e6:.1f} MB")
 
     # calculate the minimum number of function evaluations that must be valid
