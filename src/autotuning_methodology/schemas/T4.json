@@ -7,7 +7,7 @@
         "schema_version": {
             "description": "The version number of the schema in major.minor.patch format.",
             "type": "string",
-            "pattern": "^[0-9]{1,}.[0-9]{1,}.[0-9]{1,}$",
+            "pattern": "^[0-9]{1,}\\.[0-9]{1,}\\.[0-9]{1,}$",
             "examples": ["1.1.0"]
         },
         "metadata": {
@@ -48,35 +48,52 @@
             }
         },
         "results": {
+            "description": "Array of tuning results, one per tested configuration",
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
                     "timestamp": {
+                        "description": "ISO 8601 timestamp when this configuration was evaluated",
                         "type": "string"
                     },
                     "configuration": {
+                        "description": "The parameter configuration tested. Keys are parameter names, values are parameter values.",
                         "type": "object"
                     },
                     "objectives": {
-                        "type": "array"
+                        "description": "List of optimization objectives for this result",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "examples": ["time"]
                     },
                     "times": {
+                        "description": "Breakdown of time measurements for this configuration",
                         "type": "object",
                         "properties": {
                             "compilation_time": {
+                                "description": "Time spent compiling the kernel function",
                                 "type": "number"
                             },
                             "runtimes": {
-                                "type": "array"
+                                "description": "Array of kernel runtime measurements",
+                                "type": "array",
+                                "items": {
+                                    "type": "number"
+                                }
                             },
                             "framework": {
+                                "description": "Total framework overhead (sum of data, profiling, and kernel overhead)",
                                 "type": "number"
                             },
                             "search_algorithm": {
+                                "description": "Time spent by the search algorithm selecting this configuration",
                                 "type": "number"
                             },
                             "validation": {
+                                "description": "Time spent validating correctness of results",
                                 "type": "number"
                             },
                             "data": {
@@ -98,6 +115,7 @@
                         }
                     },
                     "invalidity": {
+                        "description": "Status indicating whether the configuration is valid or the reason for invalidity",
                         "enum": [
                             "timeout",
                             "compile",
@@ -108,24 +126,27 @@
                         ]
                     },
                     "correctness": {
-                        "type": "number"
+                        "description": "Binary indicator of correctness (1 = correct, 0 = incorrect)",
+                        "type": "number",
+                        "enum": [0, 1]
                     },
                     "measurements": {
+                        "description": "Array of measurements including runtime and optional profiling counters",
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "name": {
-                                    "type": "string"
+                                    "description": "Name of the measurement or profiling counter",
+                                    "type": "string",
+                                    "example": "time"
                                 },
                                 "value": {
-                                    "type": [
-                                        "number",
-                                        "string",
-                                        "array"
-                                    ]
+                                    "description": "The measured value",
+                                    "type": ["number", "string", "array"]
                                 },
                                 "unit": {
+                                    "description": "Unit of measurement (empty string if dimensionless or in metadata timeunit)",
                                     "type": "string"
                                 },
                                 "type": {
